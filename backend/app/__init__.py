@@ -1,0 +1,1 @@
+"""SentinelRAG backend application package."""

@@ -1,0 +1,77 @@
+from fastapi.testclient import TestClient
+
+
+def _auth(client: TestClient) -> dict[str, str]:
+    login = client.post(
+        "/api/auth/login",
+        json={"email": "demo@sentinelrag.dev", "password": "demo1234"},
+    )
+    token = login.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+def test_upload_status_events_and_query(client: TestClient) -> None:
+    headers = _auth(client)
+    upload = client.post(
+        "/api/videos",
+        headers=headers,
+        files={"file": ("lobby.mp4", b"fake-video-bytes", "video/mp4")},
+        data={"camera_id": "cam-01"},
+    )
+    assert upload.status_code == 201
+    video_id = upload.json()["video_id"]
+    assert upload.json()["camera_id"] == "cam-01"
+
+    status = client.get(f"/api/videos/{video_id}/status", headers=headers)
+    assert status.status_code == 200
+    assert status.json()["status"] == "ready"
+    assert len(status.json()["stages"]) == 6
+
+    events = client.get(f"/api/videos/{video_id}/events", headers=headers)
+    assert events.status_code == 200
+    body = events.json()
+    assert body["count"] >= 1
+    event = body["events"][0]
+    for key in (
+        "event_id",
+        "video_id",
+        "camera_id",
+        "start_timestamp",
+        "end_timestamp",
+        "caption",
+        "detected_classes",
+        "bounding_boxes",
+        "thumbnail_path",
+        "confidence_score",
+    ):
+        assert key in event
+
+    query = client.post(
+        "/api/query",
+        headers=headers,
+        json={"question": "Did anyone in a red jacket enter after 21:00?", "video_id": video_id},
+    )
+    assert query.status_code == 200
+    payload = query.json()
+    assert payload["answer"]
+    assert payload["citations"]
+    assert payload["citations"][0]["video_id"] == video_id
+    assert payload["citations"][0]["camera_id"] == "cam-01"
+
+
+def test_events_before_ready_conflict(client: TestClient, monkeypatch: object) -> None:
+    headers = _auth(client)
+    from app.core.config import get_settings, reset_settings_cache
+
+    monkeypatch.setenv("MOCK_PROCESSING_SECONDS", "30")  # type: ignore[attr-defined]
+    reset_settings_cache()
+    assert get_settings().mock_processing_seconds == 30
+
+    upload = client.post(
+        "/api/videos",
+        headers=headers,
+        files={"file": ("clip.mp4", b"bytes", "video/mp4")},
+    )
+    video_id = upload.json()["video_id"]
+    events = client.get(f"/api/videos/{video_id}/events", headers=headers)
+    assert events.status_code == 409
