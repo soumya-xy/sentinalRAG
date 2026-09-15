@@ -1,8 +1,4 @@
-"""Batch ingest pipeline stages.
-
-Each module exposes a typed interface. Bodies are mocks with TODOs so
-YOLO11 / Qwen2.5-VL / Chroma can be swapped in without changing routers.
-"""
+"""Batch ingest pipeline stages (temp files only; persist in Supabase)."""
 
 from app.pipeline.runner import run_ingest_pipeline
 

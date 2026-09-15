@@ -22,11 +22,17 @@ frontend/dist/
 frontend/.vite/
 *.tsbuildinfo
 
+# Model weights downloaded by Ultralytics / Hugging Face
+*.pt
+*.onnx
+backend/.model_cache/
+
 # Local runtime data (uploads, frames, chroma)
 data/videos/*
 data/thumbnails/*
 data/frames/*
 data/chroma/*
+data/catalog.json
 !data/videos/.gitkeep
 !data/thumbnails/.gitkeep
 !data/frames/.gitkeep

@@ -9,8 +9,8 @@ const PIPELINE = [
   { n: '02', title: 'Sample frames', detail: 'Fixed interval or scene-change. Not every frame.' },
   { n: '03', title: 'Detect', detail: 'YOLO11 with pretrained COCO weights.' },
   { n: '04', title: 'Construct events', detail: 'Group detections into time-bounded records.' },
-  { n: '05', title: 'Caption', detail: 'Qwen2.5-VL on flagged frames. Rule-based fallback.' },
-  { n: '06', title: 'Index', detail: 'Embed captions and metadata in ChromaDB.' },
+  { n: '05', title: 'Caption', detail: 'Gemini vision on flagged frames. Rule-based fallback.' },
+  { n: '06', title: 'Index', detail: 'Embed captions into Supabase pgvector.' },
   { n: '07', title: 'Query', detail: 'LangGraph answer with timestamp, camera, thumbnail.' },
 ]
 

@@ -30,7 +30,7 @@ export function AuthPage() {
   const hint = useMemo(
     () =>
       mode === 'login'
-        ? 'Demo operator: demo@sentinelrag.dev / demo1234'
+        ? 'Use the email and password you registered with Supabase Auth.'
         : 'Use a work email. Password must be at least 8 characters.',
     [mode],
   )

@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from app.models.event import BoundingBox
 
@@ -8,7 +9,7 @@ class SampledFrame:
     frame_index: int
     timestamp_seconds: float
     timestamp_label: str
-    image_path: str | None = None
+    image_path: Path | None = None
 
 
 @dataclass
@@ -31,6 +32,7 @@ class EventDraft:
     bounding_boxes: list[BoundingBox]
     confidence_score: float
     representative_timestamp: str
+    representative_image_path: Path | None = None
     caption: str = ""
     caption_source: str = "rule_based"
     thumbnail_path: str = ""

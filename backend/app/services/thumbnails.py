@@ -1,5 +1,9 @@
+from pathlib import Path
+
+import cv2
+import numpy as np
+
 from app.models.event import BoundingBox
-from app.services.storage import thumbnail_file_path
 
 
 def render_thumbnail_svg(
@@ -31,23 +35,38 @@ def render_thumbnail_svg(
 """
 
 
-def write_event_thumbnail(
+def render_event_thumbnail(
     *,
-    video_id: str,
-    event_id: str,
     camera_id: str,
     timestamp: str,
     label: str,
     boxes: list[BoundingBox],
-) -> str:
-    path = thumbnail_file_path(video_id, event_id)
-    path.write_text(
-        render_thumbnail_svg(
-            camera_id=camera_id,
-            timestamp=timestamp,
-            label=label,
-            boxes=boxes,
-        ),
-        encoding="utf-8",
+    image_path: Path | None = None,
+) -> tuple[bytes, str, str]:
+    """Return (bytes, suffix, content_type). Does not write to disk."""
+    if image_path is not None and image_path.exists():
+        frame = cv2.imread(str(image_path))
+        if frame is not None:
+            for box in boxes:
+                x1, y1 = int(box.x), int(box.y)
+                x2, y2 = int(box.x + box.w), int(box.y + box.h)
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (143, 168, 136), 2)
+            ok, encoded = cv2.imencode(".jpg", frame)
+            if ok:
+                return encoded.tobytes(), ".jpg", "image/jpeg"
+
+    svg = render_thumbnail_svg(
+        camera_id=camera_id,
+        timestamp=timestamp,
+        label=label,
+        boxes=boxes,
     )
-    return str(path)
+    return svg.encode("utf-8"), ".svg", "image/svg+xml"
+
+
+def encode_placeholder() -> tuple[bytes, str, str]:
+    blank = np.zeros((180, 320, 3), dtype=np.uint8)
+    ok, encoded = cv2.imencode(".jpg", blank)
+    if ok:
+        return encoded.tobytes(), ".jpg", "image/jpeg"
+    return b"", ".jpg", "image/jpeg"

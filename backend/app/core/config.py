@@ -1,7 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -23,32 +22,37 @@ class Settings(BaseSettings):
     app_port: int = 8000
     log_level: str = "info"
 
-    video_storage_path: str = "./data/videos"
-    thumbnail_storage_path: str = "./data/thumbnails"
-    frame_cache_path: str = "./data/frames"
+    supabase_url: str = ""
+    supabase_anon_key: str = ""
+    supabase_service_role_key: str = ""
+    supabase_jwt_secret: str = ""
+    supabase_videos_bucket: str = "videos"
+    supabase_thumbnails_bucket: str = "thumbnails"
 
     frame_sample_interval_seconds: float = 1.5
     use_scene_change_detection: bool = False
+    event_gap_seconds: float = 6.0
 
     yolo_model_name: str = "yolo11n.pt"
     yolo_confidence_threshold: float = 0.4
-    yolo_device: str = "cuda"
+    yolo_device: str = "auto"
+    yolo_class_filter: str = (
+        "person,bicycle,car,motorcycle,bus,truck,backpack,handbag,suitcase,dog,cat"
+    )
 
+    vlm_provider: str = "gemini"
     vlm_model_name: str = "Qwen/Qwen2.5-VL-7B-Instruct"
-    vlm_inference_mode: str = "local"
+    vlm_inference_mode: str = "api"
     vlm_inference_endpoint: str = ""
-    vlm_use_rule_based_fallback: bool = True
+    vlm_use_rule_based_fallback: bool = False
     huggingface_token: str = ""
 
+    embedding_provider: str = "google"
     embedding_model_name: str = "BAAI/bge-m3"
+    google_embedding_model: str = "models/text-embedding-004"
+    embedding_dimensions: int = 768
 
-    chroma_mode: str = "local"
-    chroma_db_path: str = "./data/chroma"
-    chroma_host: str = ""
-    chroma_port: str = ""
-    chroma_collection_name: str = "sentinelrag_events"
-
-    llm_provider: str = "anthropic"
+    llm_provider: str = "google"
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-sonnet-4-6"
     openai_api_key: str = ""
@@ -63,7 +67,7 @@ class Settings(BaseSettings):
 
     allowed_origins: str = "http://localhost:3000"
 
-    mock_processing_seconds: float = Field(default=9.0)
+    ingest_in_background: bool = True
 
     @property
     def cors_origins(self) -> list[str]:
@@ -75,27 +79,20 @@ class Settings(BaseSettings):
             return self.jwt_secret_key
         return "sentinelrag-dev-jwt-secret-change-me"
 
-    def resolve_path(self, raw: str) -> Path:
-        path = Path(raw)
-        if path.is_absolute():
-            return path
-        return (REPO_ROOT / path).resolve()
+    @property
+    def supabase_enabled(self) -> bool:
+        return bool(self.supabase_url and self.supabase_anon_key and self.supabase_service_role_key)
 
     @property
-    def videos_dir(self) -> Path:
-        return self.resolve_path(self.video_storage_path)
+    def yolo_allowed_classes(self) -> set[str]:
+        return {item.strip() for item in self.yolo_class_filter.split(",") if item.strip()}
 
-    @property
-    def thumbnails_dir(self) -> Path:
-        return self.resolve_path(self.thumbnail_storage_path)
-
-    @property
-    def frames_dir(self) -> Path:
-        return self.resolve_path(self.frame_cache_path)
-
-    @property
-    def chroma_dir(self) -> Path:
-        return self.resolve_path(self.chroma_db_path)
+    def resolve_yolo_weights(self) -> str:
+        name = self.yolo_model_name
+        for candidate in (BACKEND_ROOT / name, REPO_ROOT / name, Path(name)):
+            if candidate.is_file():
+                return str(candidate.resolve())
+        return name
 
 
 @lru_cache(maxsize=1)

@@ -1,4 +1,7 @@
+import pytest
 from fastapi.testclient import TestClient
+
+from tests.fakes import complete_ingest_for_tests
 
 
 def _auth(client: TestClient) -> dict[str, str]:
@@ -10,7 +13,13 @@ def _auth(client: TestClient) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def test_upload_status_events_and_query(client: TestClient) -> None:
+def test_upload_status_events_and_query(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("app.api.videos.enqueue_ingest", complete_ingest_for_tests)
+    monkeypatch.setattr(
+        "app.graphs.query_graph.retrieve_events",
+        lambda question, events, **kwargs: events[:3],
+    )
+
     headers = _auth(client)
     upload = client.post(
         "/api/videos",
@@ -21,6 +30,7 @@ def test_upload_status_events_and_query(client: TestClient) -> None:
     assert upload.status_code == 201
     video_id = upload.json()["video_id"]
     assert upload.json()["camera_id"] == "cam-01"
+    assert upload.json()["status"] == "ready"
 
     status = client.get(f"/api/videos/{video_id}/status", headers=headers)
     assert status.status_code == 200
@@ -59,19 +69,14 @@ def test_upload_status_events_and_query(client: TestClient) -> None:
     assert payload["citations"][0]["camera_id"] == "cam-01"
 
 
-def test_events_before_ready_conflict(client: TestClient, monkeypatch: object) -> None:
+def test_events_before_ready_conflict(client: TestClient) -> None:
     headers = _auth(client)
-    from app.core.config import get_settings, reset_settings_cache
-
-    monkeypatch.setenv("MOCK_PROCESSING_SECONDS", "30")  # type: ignore[attr-defined]
-    reset_settings_cache()
-    assert get_settings().mock_processing_seconds == 30
-
     upload = client.post(
         "/api/videos",
         headers=headers,
         files={"file": ("clip.mp4", b"bytes", "video/mp4")},
     )
     video_id = upload.json()["video_id"]
+    assert upload.json()["status"] == "uploaded"
     events = client.get(f"/api/videos/{video_id}/events", headers=headers)
     assert events.status_code == 409

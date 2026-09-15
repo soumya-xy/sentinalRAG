@@ -11,7 +11,7 @@ SentinelRAG lets a user upload a pre-recorded CCTV/surveillance video and ask na
 This is **not** a live/real-time surveillance system. Video is uploaded, processed once in batch, and then queried repeatedly. This mirrors how real enterprise video-search products (e.g., Verkada, Axis) are architected: index first, query later.
 
 **One-line pitch (for README/resume use):**
-> A video-surveillance RAG system combining YOLO11 detection, Qwen2.5-VL event captioning, and ChromaDB retrieval, enabling natural-language querying of recorded CCTV footage with timestamp-grounded answers and visual citations.
+> A video-surveillance RAG system combining YOLO11 detection, Gemini event captioning, and Supabase pgvector retrieval, enabling natural-language querying of recorded CCTV footage with timestamp-grounded answers and visual citations.
 
 ---
 
@@ -45,10 +45,14 @@ Only begin after Phase 1 is fully working and demo-able. Extends the same pipeli
 | Processing mode | Batch (offline), not live/real-time | Avoids streaming infra complexity; matches real-world enterprise video search products; keeps scope achievable solo |
 | Detection model | Ultralytics **YOLO11** (not YOLOv8, not YOLO26) | Stronger small/cluttered-object performance than YOLOv8; more mature/documented than the newer YOLO26; widely recognized by recruiters |
 | Detection weights | Pretrained COCO weights by default; light fine-tuning on a small custom subset is a stretch goal, not a requirement | Avoids the cost/time of training from scratch; COCO already covers person/vehicle/bag classes needed here |
-| Captioning model | **Qwen2.5-VL (3B or 7B)** | Open-source, runs on a single consumer/cloud GPU, proven for timestamp-grounded long-video indexing use cases |
+| Captioning model | **Gemini 2.0 Flash (API)** when no local GPU/vLLM is available; **Qwen2.5-VL (3B/7B)** remains the local option | Phase 1 is runnable with a Gemini API key only. Local Qwen2.5-VL is the original design and stays documented for a later GPU box; it is not required to leave demo mode. |
 | Captioning trigger | Two-stage: cheap YOLO detection flags "interesting" frames/windows first; expensive VLM captioning only runs on flagged frames | Avoids running a heavy VLM on every sampled frame; real system-design pattern worth calling out explicitly in docs/interviews |
-| Fallback captioning | Rule-based template captions (e.g., "person detected, red shirt, 14:32") are an acceptable v1 if VLM integration is delayed | Keeps a working demo possible even if VLM captioning slips |
-| Vector database | **ChromaDB** | Already used in author's prior project (RAGHive); free, local, fast to iterate; sufficient for project scale |
+| Fallback captioning | Rule-based template captions (e.g., "person detected, red shirt, 14:32") if the Gemini key is missing or a vision call fails | Keeps ingest from dying when the API is rate-limited or offline |
+| Answer-generation LLM | **Gemini** via LangGraph (`LLM_PROVIDER=google`) | Matches the author's available API; Anthropic/OpenAI stay in config but are not required |
+| Embeddings | **Gemini text-embedding-004** (768-d) by default; **BGE-M3** if `EMBEDDING_PROVIDER=local` | Same vectors are stored in Supabase pgvector. Local BGE-M3 is optional. |
+| Vector database | **Supabase pgvector** (replaces ChromaDB) | One hosted Postgres for events + similarity search. Requested explicitly so nothing is persisted on the laptop. |
+| Object storage | **Supabase Storage** (videos + thumbnails) | Per-user object keys. The API only uses OS temp files while YOLO runs, then deletes them. |
+| Auth | **Supabase Auth** | Replaces the in-memory JWT demo users. Each account only sees its own videos. |
 | Orchestration | **LangGraph** | Consistent with author's existing framework experience; shows depth in one framework rather than scattered tools |
 | Backend | **FastAPI** | Consistent with author's stack; lightweight, async-friendly |
 | Frame sampling | Fixed interval (e.g., 1 frame every 1–2 sec) or scene-change detection via OpenCV — not every frame | Reduces redundant processing; every-frame processing is unnecessary and expensive |
@@ -73,17 +77,17 @@ If a future prompt asks to change one of these (e.g., "let's make it live" or "s
 [Event Construction]  (group consecutive detections into time-bounded "events")
       │  e.g., "person present from 00:14:20–00:14:45"
       ▼
-[Captioning]  (Qwen2.5-VL on flagged frames; rule-based fallback)
+[Captioning]  (Gemini vision on flagged frames; rule-based fallback; Qwen2.5-VL if a local GPU is added later)
       │  → natural language description of each event
       ▼
-[Indexing]  (embed captions + metadata into ChromaDB)
+[Indexing]  (embed captions + metadata into Supabase Postgres / pgvector)
       │  metadata: video_id/camera_id, timestamp range, thumbnail path, bounding box, confidence
       ▼
 [Query Time]
       User asks a natural-language question
       │
       ▼
-[Retrieval]  (ChromaDB similarity search over event captions)
+[Retrieval]  (Supabase pgvector similarity search over event captions)
       │
       ▼
 [Answer Generation]  (LLM via LangGraph — answers with citation: timestamp + camera + thumbnail)
@@ -138,5 +142,5 @@ This `CLAUDE.md` file should stay in sync with the above if any core decision ch
 
 - Treat Section 4 (Design Decisions) as binding unless the author explicitly revisits it.
 - Treat Section 3 (Build Phases) as a gate — do not implement Phase 2 features while Phase 1 is incomplete.
-- Treat Section 6 (Schema) as the contract for any code touching detection output, captioning output, or ChromaDB records.
+- Treat Section 6 (Schema) as the contract for any code touching detection output, captioning output, or pgvector records.
 - If a request conflicts with this file, point out the conflict before proceeding rather than silently overriding it.

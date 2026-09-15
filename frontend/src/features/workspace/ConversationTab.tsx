@@ -46,7 +46,6 @@ export function ConversationTab({
     const placeholder: Turn = { question: trimmed, response: null, error: null }
     setTurns((current) => [...current, placeholder])
     try {
-      await new Promise((resolve) => window.setTimeout(resolve, 420))
       const response = await api.query({ question: trimmed, video_id: video.video_id })
       setTurns((current) => {
         const next = [...current]

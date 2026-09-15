@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from uuid import uuid4
 
+from app.core.config import get_settings
 from app.pipeline.types import Detection, EventDraft
 
 
@@ -22,12 +23,16 @@ class EventConstructor:
         *,
         video_id: str,
         camera_id: str,
-        gap_seconds: float = 22.0,
+        gap_seconds: float | None = None,
     ) -> list[EventDraft]:
         """Merge nearby same-class detections into events.
 
-        TODO: replace heuristic with track IDs once a tracker is added.
+        Spatial tracking is out of scope for Phase 1 (no track IDs yet).
         """
+        if not detections:
+            return []
+
+        gap = gap_seconds if gap_seconds is not None else get_settings().event_gap_seconds
         by_class: dict[str, list[Detection]] = defaultdict(list)
         for detection in sorted(detections, key=lambda item: item.frame.timestamp_seconds):
             by_class[detection.label].append(detection)
@@ -36,7 +41,7 @@ class EventConstructor:
         for label, items in by_class.items():
             cluster: list[Detection] = [items[0]]
             for item in items[1:]:
-                if item.frame.timestamp_seconds - cluster[-1].frame.timestamp_seconds <= gap_seconds:
+                if item.frame.timestamp_seconds - cluster[-1].frame.timestamp_seconds <= gap:
                     cluster.append(item)
                 else:
                     drafts.append(self._to_draft(cluster, label, video_id, camera_id))
@@ -67,5 +72,6 @@ class EventConstructor:
             bounding_boxes=[mid.box],
             confidence_score=round(confidence, 3),
             representative_timestamp=mid.frame.timestamp_label,
+            representative_image_path=mid.frame.image_path,
             notes=[f"{len(cluster)} detections clustered"],
         )

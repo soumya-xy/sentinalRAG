@@ -18,14 +18,21 @@ The system as a single black box, showing only external entities and the data cr
 flowchart LR
     User([User])
     Sys((SentinelRAG System))
+    SB[(Supabase
+    Auth / Storage / pgvector)]
+    Gemini([Gemini API])
 
     User -- "Video file (upload)" --> Sys
     User -- "Natural language question" --> Sys
     Sys -- "Answer + timestamp + thumbnail citation" --> User
     Sys -- "Processing status / progress" --> User
+    Sys -- "Auth, objects, event rows, vectors" --> SB
+    SB -- "Sessions, files, retrieved events" --> Sys
+    Sys -- "Captions / embeddings / answers" --> Gemini
+    Gemini -- "Text + vectors" --> Sys
 ```
 
-**Description:** A user uploads a video and later asks natural-language questions about its contents. The system returns grounded answers with timestamp and visual citations. No other external systems are involved in the current (Phase 1) scope — no live camera feeds, no third-party alerting systems.
+**Description:** A user uploads a video and later asks natural-language questions. SentinelRAG persists nothing on the laptop: Supabase holds accounts, files, and pgvector rows. Gemini provides vision captions, embeddings, and answers. No live camera feeds.
 
 ---
 
@@ -53,10 +60,12 @@ flowchart TD
     Generate
     Grounded Answer"))
 
-    DS1[(Video Storage)]
-    DS2[(Event Store
-    ChromaDB)]
-    DS3[(Thumbnail Storage)]
+    DS1[(Supabase Storage
+    videos)]
+    DS2[(Supabase Postgres
+    pgvector)]
+    DS3[(Supabase Storage
+    thumbnails)]
 
     User -- "Video file" --> P1
     P1 -- "Stored video" --> DS1
@@ -80,9 +89,9 @@ flowchart TD
 
 **Description of processes:**
 - **1.0 Upload & Ingest Video** — accepts the uploaded file, assigns a `video_id`, stores it.
-- **2.0 Detect & Caption Events** — samples frames, runs YOLO11 detection, constructs time-bounded events, generates natural-language captions (Qwen2.5-VL or rule-based fallback).
-- **3.0 Index Events** — embeds event captions/metadata and writes them into ChromaDB.
-- **4.0 Process User Query** — embeds the user's question, retrieves the most relevant events from ChromaDB.
+- **2.0 Detect & Caption Events** — samples frames, runs YOLO11 detection, constructs time-bounded events, generates natural-language captions (Gemini vision, or rule-based fallback).
+- **3.0 Index Events** — embeds event captions/metadata and writes them into Supabase Postgres (pgvector).
+- **4.0 Process User Query** — embeds the user's question, retrieves the most relevant events from pgvector.
 - **5.0 Generate Grounded Answer** — uses an LLM (via LangGraph) to compose a natural-language answer citing timestamp, camera/video ID, and thumbnail.
 
 ---
@@ -108,7 +117,7 @@ flowchart TD
     P2_4(("2.4
     Event
     Captioning
-    (Qwen2.5-VL /
+    (Gemini /
     rule-based)"))
 
     DS3[(Thumbnail Storage)]
@@ -140,7 +149,7 @@ flowchart TD
 - **2.1 Frame Sampling** — extracts frames at a fixed interval or via scene-change detection (avoids processing every frame).
 - **2.2 Object Detection** — runs YOLO11 on sampled frames; flags frames with meaningful detections for captioning (the two-stage cheap-detector → expensive-captioner design).
 - **2.3 Event Construction** — groups consecutive per-frame detections into human-meaningful, time-bounded events.
-- **2.4 Event Captioning** — generates a natural-language description per event, using Qwen2.5-VL on flagged frames, or a rule-based template as fallback.
+- **2.4 Event Captioning** — generates a natural-language description per event, using Gemini vision on flagged frames, or a rule-based template as fallback.
 
 ---
 
@@ -150,7 +159,7 @@ flowchart TD
 flowchart TD
     User([User])
     DS2[(Event Store
-    ChromaDB)]
+    pgvector)]
     DS3[(Thumbnail Storage)]
 
     P4_1(("4.1
@@ -191,7 +200,7 @@ flowchart TD
 
 **Description:**
 - **4.1 Parse & Embed Query** — converts the user's natural-language question into a vector embedding.
-- **4.2 Similarity Retrieval** — queries ChromaDB for the most semantically similar indexed events.
+- **4.2 Similarity Retrieval** — queries pgvector for the most semantically similar indexed events.
 - **4.3 Rank / Filter Results** — applies confidence thresholds and any filters (e.g., specific camera/video, time range) before passing results forward.
 - **5.1 LLM Answer Composition** — an LLM (orchestrated via LangGraph) drafts a natural-language answer grounded in the retrieved events.
 - **5.2 Citation Assembly** — attaches the supporting timestamp, camera/video ID, and thumbnail to the final answer shown to the user.

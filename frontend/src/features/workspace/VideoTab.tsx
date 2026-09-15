@@ -70,8 +70,9 @@ export function VideoTab({
     <div className="max-w-3xl">
       <h1 className="text-2xl font-medium">Ingest</h1>
       <p className="mt-2 max-w-prose text-sm text-muted">
-        Phase 1 accepts a single recorded video. Processing is batch: sample, detect, caption,
-        then index. Query stays closed until the last stage completes.
+        Phase 1 accepts a single recorded video. Processing is batch: sample, detect with
+        YOLO11, caption with Gemini, then index in Supabase pgvector. Query stays closed until the
+        last stage completes.
       </p>
 
       <form onSubmit={onSubmit} className="mt-8 space-y-4">
@@ -117,7 +118,7 @@ export function VideoTab({
         <div className="mt-12">
           <EmptyState
             title="Nothing ingested yet"
-            body="Choose a file to assign a video_id and run the stub pipeline. Real YOLO / Qwen / Chroma implementations can replace the backend stages without changing this screen."
+            body="Choose a recorded CCTV file. The backend will sample frames, run YOLO11, caption events, and index them for questions."
           />
         </div>
       ) : (

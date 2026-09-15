@@ -1,50 +1,61 @@
-"""2.2 Object detection — Ultralytics YOLO11."""
+"""2.2 Object detection — Ultralytics YOLO11 (pretrained COCO)."""
+
 from __future__ import annotations
-from ultralytics import YOLO
+
+import logging
+
 from app.core.config import get_settings
 from app.models.event import BoundingBox
 from app.pipeline.types import Detection, SampledFrame
+from app.services.ml import get_yolo
+
+logger = logging.getLogger("sentinelrag.detect")
+
 
 class ObjectDetector:
-    def __init__(self):
-        settings = get_settings()
-        self.model = YOLO(settings.yolo_model_name)
-
     def detect(self, frames: list[SampledFrame]) -> list[Detection]:
         settings = get_settings()
+        model, device = get_yolo()
         threshold = settings.yolo_confidence_threshold
+        allowed = settings.yolo_allowed_classes
         detections: list[Detection] = []
 
         for frame in frames:
-            if not frame.image_path or not frame.image_path.exists():
+            if frame.image_path is None or not frame.image_path.exists():
                 continue
 
-            results = self.model(
+            results = model(
                 str(frame.image_path),
                 conf=threshold,
-                device=settings.yolo_device,
+                device=device,
                 verbose=False,
             )[0]
 
+            if results.boxes is None:
+                continue
+
             for box in results.boxes:
                 cls_id = int(box.cls[0])
-                label = self.model.names[cls_id]
+                label = str(model.names[cls_id])
+                if allowed and label not in allowed:
+                    continue
                 conf = float(box.conf[0])
-                x_center, y_center, width, height = box.xywh[0].tolist()
-
+                x1, y1, x2, y2 = (float(v) for v in box.xyxy[0].tolist())
                 detections.append(
                     Detection(
                         frame=frame,
                         label=label,
                         confidence=round(conf, 3),
                         box=BoundingBox(
-                            x=round(x_center, 1),
-                            y=round(y_center, 1),
-                            w=round(width, 1),
-                            h=round(height, 1),
+                            x=round(x1, 1),
+                            y=round(y1, 1),
+                            w=round(max(0.0, x2 - x1), 1),
+                            h=round(max(0.0, y2 - y1), 1),
                             frame_timestamp=frame.timestamp_label,
                         ),
                         interesting=True,
                     )
                 )
+
+        logger.info("YOLO produced %s detections from %s frames", len(detections), len(frames))
         return detections

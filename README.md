@@ -1,30 +1,44 @@
 # SentinelRAG
 
-Video-surveillance RAG: upload recorded CCTV, ask natural-language questions, get answers grounded in a timestamp, camera/video ID, and cited frame.
+Video-surveillance RAG: upload recorded CCTV, ask natural-language questions, get answers grounded in a timestamp, camera/video ID, and a cited frame.
 
-Phase 1 is a single-video vertical slice. The UI and API contracts are complete. YOLO11, Qwen2.5-VL, ChromaDB, and LangGraph are **stubbed** behind stable interfaces so inference can be wired later without rewriting the frontend.
+**Nothing user-specific is stored on this machine.** Auth, videos, thumbnails, event rows, and vectors live in **Supabase**. The API only writes OS temp files while YOLO runs, then deletes them.
 
-## Setup
+## What you must paste into `.env`
 
-```powershell
-copy env.example .env
-```
+Create a Supabase project, then copy `env.example` to `.env` and fill:
 
-Fill keys in `.env` when you add real models. The app runs with the defaults for a local demo.
+| Variable | Where to get it |
+|---|---|
+| `SUPABASE_URL` | Project Settings → API → Project URL (`https://xxxx.supabase.co`) |
+| `SUPABASE_ANON_KEY` | Project Settings → API → `anon` `public` key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Project Settings → API → `service_role` key (**secret** — backend only) |
+| `GOOGLE_API_KEY` | [Google AI Studio](https://aistudio.google.com/apikey) |
 
-### Backend
+Optional: `SUPABASE_JWT_SECRET` (Settings → API → JWT Secret). The backend uses `auth.get_user` so this is not required.
+
+You do **not** need a separate database URL. The service role key can read/write Postgres and Storage.
+
+## One-time Supabase setup
+
+1. Auth → Providers → Email: turn **Confirm email** **off** while you develop (otherwise register returns no session).
+2. SQL Editor: run [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql). That creates:
+   - `vector` extension
+   - `videos` and `events` tables (`events.embedding vector(768)`)
+   - `match_events(...)` RPC for similarity search
+   - private buckets `videos` and `thumbnails`
+   - RLS so each `auth.uid()` only sees its own rows/objects
+3. Confirm Storage shows buckets `videos` and `thumbnails`.
+
+The backend uses the **service role**, which bypasses RLS. Policies are there so a leaked anon key cannot read another user's files.
+
+## Run
 
 ```powershell
 cd backend
 python -m pip install -r requirements.txt
 python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
-
-API docs: http://localhost:8000/docs
-
-Demo login: `demo@sentinelrag.dev` / `demo1234`
-
-### Frontend
 
 ```powershell
 cd frontend
@@ -33,27 +47,29 @@ npm install
 npm run dev
 ```
 
-UI: http://localhost:3000 (CORS origin matches `ALLOWED_ORIGINS` in `env.example`).
+Open http://localhost:3000 and **register** a real account (no demo user).
 
-```powershell
-npm run build
-```
-
-### Tests
+Upload a short clip first (30–90s). YOLO still runs on your CPU/GPU.
 
 ```powershell
 cd backend
 python -m pytest
 ```
 
-## Stubbed vs real
+Tests force an empty Supabase config and use an in-memory catalog. They never write `data/`.
 
-| Surface | Status |
+## What lives where
+
+| Data | Location |
 |---|---|
-| Auth (register / login / logout / me) | Mock JWT + in-memory users |
-| Video upload + processing status | File saved; stages advance on a timer, then mock events are materialized |
-| Frame sampling / YOLO11 / caption / Chroma index | Typed pipeline modules, mock bodies, `NotImplemented` real paths |
-| Query + citations | Keyword retrieval + LangGraph-shaped compose/cite stub |
-| Frontend `src/lib/api` | Single swap point for real HTTP behavior |
+| Users / passwords / sessions | Supabase Auth |
+| Uploaded videos | Supabase Storage `videos/{user_id}/{video_id}.mp4` |
+| Event thumbnails | Supabase Storage `thumbnails/{user_id}/{video_id}/{event_id}.jpg` |
+| Video status + event captions | Supabase table `videos` / `events` |
+| Caption vectors | `events.embedding` (pgvector, 768-d Gemini embeddings) |
+| YOLO weights | Local `yolo11n.pt` only (model file, not user data) |
+| Sampled frames | OS temp dir, deleted when ingest finishes |
 
-Processing time is `MOCK_PROCESSING_SECONDS` (default 9) so the ingest progress UI is visible.
+## Pipeline
+
+Upload → OpenCV sample (temp) → YOLO11 → event windows → Gemini captions → Gemini embeddings → pgvector → LangGraph answer with citations.
