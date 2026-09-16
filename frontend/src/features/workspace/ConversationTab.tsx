@@ -4,8 +4,11 @@ import { Link } from 'react-router-dom'
 import { Button } from '../../components/Button.tsx'
 import { EmptyState } from '../../components/EmptyState.tsx'
 import { ErrorBanner } from '../../components/ErrorBanner.tsx'
+import { ProcessTrail } from '../../components/ProcessTrail.tsx'
+import { ProvenanceNote } from '../../components/ProvenanceNote.tsx'
 import { TextArea } from '../../components/Input.tsx'
 import { api, ApiError } from '../../lib/api/index.ts'
+import { answerSourceLabel, currentStageHeadline } from '../../lib/pipelineCopy.ts'
 import type { QueryResponse, VideoRecord, VideoStatusResponse } from '../../types/api.ts'
 import { CitationCard } from './CitationCard.tsx'
 
@@ -83,39 +86,54 @@ export function ConversationTab({
   if (!video) {
     return (
       <EmptyState
-        title="No footage indexed"
-        body="Upload a recorded CCTV video first. The intelligence query interface activates after the full pipeline completes."
+        title="Nothing to ask yet"
+        body="Questions search an index of captions, not the raw video. Upload footage first so YOLO, Gemini, and pgvector can build that index."
         action={
           <Link to="/workspace?tab=video" className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-[#CB2957] hover:text-[#e0325f] border border-[#CB2957]/40 px-4 py-2 rounded-sm transition-all">
             Ingest Footage →
           </Link>
         }
-      />
+      >
+        <ProcessTrail
+          steps={[
+            { title: 'Upload a clip', body: 'The file is stored in Supabase. Nothing user-specific stays on this machine.' },
+            { title: 'Index is built', body: 'YOLO finds objects, Gemini writes captions, those sentences are embedded.' },
+            { title: 'Then you ask', body: 'The answer is composed only from retrieved captions and their frames.' },
+          ]}
+        />
+      </EmptyState>
     )
   }
 
   if (isProcessing) {
     return (
       <EmptyState
-        title="Index not ready"
-        body="Batch processing is still running. The query interface unlocks after the pgvector index stage completes."
+        title="Index is still being written"
+        body={currentStageHeadline(status?.stages, status?.current_stage, status?.status)}
         action={
           <Link to="/workspace?tab=video" className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-[#CB2957] hover:text-[#e0325f] border border-[#CB2957]/40 px-4 py-2 rounded-sm transition-all">
             Watch Pipeline →
           </Link>
         }
-      />
+      >
+        <ProcessTrail
+          steps={[
+            { title: 'Now', body: 'Frames are being turned into events and captions. That text is not on this screen yet.' },
+            { title: 'Next', body: 'When status is ready, those captions become the only source for answers.' },
+          ]}
+        />
+      </EmptyState>
     )
   }
 
   if (status?.status === 'failed') {
     return (
       <EmptyState
-        title="Processing failed"
-        body={status.error ?? 'This video did not finish indexing. Re-upload to try again.'}
+        title="No index to query"
+        body={status.error ?? 'Ingest stopped before captions were written. Retry the same file from Ingest Footage — there is nothing here to search.'}
         action={
           <Link to="/workspace?tab=video" className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-[#CB2957] border border-[#CB2957]/40 px-4 py-2 rounded-sm">
-            Return to Ingest
+            Retry on Ingest
           </Link>
         }
       />
@@ -137,9 +155,15 @@ export function ConversationTab({
         </span>
         {status?.caption_mode && (
           <span className="font-mono text-[10px] text-[#777777] uppercase tracking-widest">
-            Caption: {status.caption_mode}
+            Captions: {status.caption_mode === 'vlm' ? 'Gemini vision' : 'rule-based'}
           </span>
         )}
+      </div>
+      <div className="border-b border-[#111111] bg-[#050505] px-8 py-2.5 shrink-0">
+        <p className="text-xs text-[#888888] leading-relaxed">
+          A question is embedded, matched against this video’s event captions, then answered only from those hits.
+          The paragraph you see is not a free-form watch of the file.
+        </p>
       </div>
 
       {/* Conversation scroll area */}
@@ -152,10 +176,18 @@ export function ConversationTab({
                 <path d="M10 6v5l3 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
               </svg>
             </div>
-            <p className="font-mono text-xs uppercase tracking-widest text-[#777777] mb-2">Intelligence Query Ready</p>
-            <p className="text-xs text-[#888888] max-w-sm">
-              Ask any question about the indexed footage. Answers are grounded to timestamp evidence and visual citations.
+            <p className="font-mono text-xs uppercase tracking-widest text-[#777777] mb-2">Ready to search the index</p>
+            <p className="text-xs text-[#888888] max-w-md leading-relaxed">
+              Type a question about people, clothing, vehicles, or time. The system will retrieve stored events first.
+              The answer appears only after that retrieval — and the frames under it are the events it used.
             </p>
+            <ProcessTrail
+              steps={[
+                { title: 'Retrieve', body: 'Your question is compared to caption embeddings for this video only.' },
+                { title: 'Compose', body: 'Gemini writes a short answer from those captions and frames.' },
+                { title: 'Cite', body: 'Each card below the answer is an indexed event, not a new image generation.' },
+              ]}
+            />
           </div>
         ) : (
           turns.map((turn) => (
@@ -176,31 +208,51 @@ export function ConversationTab({
 
               {/* Answer */}
               {turn.pending ? (
-                <div className="flex items-start gap-3 ml-9">
-                  <div className="flex items-center gap-2 py-2">
+                <div className="ml-9 space-y-3">
+                  <div className="flex items-center gap-2 py-1">
                     <span className="h-1.5 w-1.5 rounded-full bg-[#CB2957] pulse-dot" />
-                    <span className="font-mono text-xs text-[#999999] uppercase tracking-widest">Querying index…</span>
+                    <span className="font-mono text-xs text-[#999999] uppercase tracking-widest">Working through the index</span>
                   </div>
+                  <ProcessTrail
+                    steps={[
+                      { title: 'Embed question', body: 'Same embedding model as the stored captions.' },
+                      { title: 'Retrieve events', body: 'Only this video. Weak matches are dropped.' },
+                      { title: 'Compose + cite', body: 'Answer text is written after retrieval, then attached to those events.' },
+                    ]}
+                  />
                 </div>
               ) : turn.response ? (
                 <div className="ml-9 space-y-4 reveal">
+                  <ProvenanceNote label="Where this answer came from">
+                    {turn.response.provenance
+                      ?? 'Retrieved indexed events for this video, then composed the answer from those rows.'}
+                  </ProvenanceNote>
                   <div>
-                    <div className="font-mono text-[9px] uppercase tracking-widest text-[#CB2957] mb-2">Intelligence Response</div>
+                    <div className="font-mono text-[9px] uppercase tracking-widest text-[#CB2957] mb-2">
+                      {answerSourceLabel(turn.response.answer_source)}
+                    </div>
                     <p className="text-sm text-[#DDDDDD] leading-relaxed border-l-2 border-[#CB2957]/30 pl-4">
                       {turn.response.answer}
                     </p>
                   </div>
-                  {turn.response.citations.length > 0 && (
+                  {turn.response.citations.length > 0 ? (
                     <div>
-                      <div className="font-mono text-[9px] uppercase tracking-widest text-[#888888] mb-3">
-                        Visual Evidence ({turn.response.citations.length})
+                      <div className="font-mono text-[9px] uppercase tracking-widest text-[#888888] mb-1">
+                        Evidence from the index ({turn.response.citations.length})
                       </div>
+                      <p className="text-xs text-[#777777] mb-3">
+                        These frames and captions already existed from ingest. They are the events the answer used.
+                      </p>
                       <div className="space-y-3">
                         {turn.response.citations.map((citation) => (
                           <CitationCard key={citation.event_id} citation={citation} />
                         ))}
                       </div>
                     </div>
+                  ) : (
+                    <p className="text-xs text-[#777777]">
+                      No event passed the retrieval floor, so there is no thumbnail to show — the system did not invent one.
+                    </p>
                   )}
                 </div>
               ) : turn.error ? (
@@ -231,7 +283,7 @@ export function ConversationTab({
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Ask about people, clothing, vehicles, objects, or time windows…"
+            placeholder="Ask about people, clothing, vehicles, or a time window in this clip…"
             disabled={!isReady || submitting}
             rows={3}
           />
@@ -254,7 +306,7 @@ export function ConversationTab({
               disabled={!isReady || submitting || question.trim().length < 3}
               className="shrink-0"
             >
-              {submitting ? 'Querying…' : 'Query Index'}
+              {submitting ? 'Searching index…' : 'Search index'}
             </Button>
           </div>
         </form>

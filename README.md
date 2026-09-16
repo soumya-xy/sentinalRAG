@@ -22,7 +22,7 @@ You do **not** need a separate database URL. The service role key can read/write
 ## One-time Supabase setup
 
 1. Auth → Providers → Email: turn **Confirm email** **off** while you develop (otherwise register returns no session).
-2. SQL Editor: run [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql). That creates:
+2. SQL Editor: run [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql). If that file was already applied earlier, also run [`supabase/migrations/002_retrieval_and_event_quality.sql`](supabase/migrations/002_retrieval_and_event_quality.sql). That creates:
    - `vector` extension
    - `videos` and `events` tables (`events.embedding vector(768)`)
    - `match_events(...)` RPC for similarity search

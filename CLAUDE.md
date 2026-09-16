@@ -74,7 +74,7 @@ If a future prompt asks to change one of these (e.g., "let's make it live" or "s
 [Detection]  (YOLO11 — pretrained COCO weights)
       │  → bounding boxes, class labels, rough attributes (position, count)
       ▼
-[Event Construction]  (group consecutive detections into time-bounded "events")
+[Event Construction]  (spatial-temporal tracks: one object per event, real duration, scene count)
       │  e.g., "person present from 00:14:20–00:14:45"
       ▼
 [Captioning]  (Gemini vision on flagged frames; rule-based fallback; Qwen2.5-VL if a local GPU is added later)

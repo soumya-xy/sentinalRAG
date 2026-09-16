@@ -39,6 +39,7 @@ create table if not exists public.events (
   thumbnail_url text,
   confidence_score double precision not null,
   caption_source text,
+  object_count integer not null default 1,
   embedding vector(768),
   created_at timestamptz not null default now()
 );
@@ -51,10 +52,14 @@ create index events_embedding_hnsw
   on public.events
   using hnsw (embedding vector_cosine_ops);
 
+drop function if exists public.match_events(vector, text, int);
+drop function if exists public.match_events(vector, text, int, uuid);
+
 create or replace function public.match_events(
   query_embedding vector(768),
   filter_video_id text,
-  match_count int default 3
+  match_count int default 8,
+  filter_user_id uuid default null
 )
 returns table (
   event_id text,
@@ -69,6 +74,7 @@ as $$
   from public.events e
   where e.video_id = filter_video_id
     and e.embedding is not null
+    and (filter_user_id is null or e.user_id = filter_user_id)
   order by e.embedding <=> query_embedding
   limit match_count;
 $$;
@@ -124,4 +130,4 @@ create policy "users write own video objects"
     and (storage.foldername(name))[1] = auth.uid()::text
   );
 
-grant execute on function public.match_events(vector, text, int) to anon, authenticated, service_role;
+grant execute on function public.match_events(vector, text, int, uuid) to anon, authenticated, service_role;

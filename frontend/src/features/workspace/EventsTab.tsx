@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom'
 import { Badge } from '../../components/Badge.tsx'
 import { Confidence } from '../../components/Confidence.tsx'
 import { EmptyState } from '../../components/EmptyState.tsx'
-import { resolveMediaUrl } from '../../lib/api/client.ts'
+import { AuthenticatedImage } from '../../components/AuthenticatedImage.tsx'
+import { ProcessTrail } from '../../components/ProcessTrail.tsx'
+import { captionSourceLabel, captionSourceShort } from '../../lib/pipelineCopy.ts'
 import type { EventRecord, VideoRecord, VideoStatusResponse } from '../../types/api.ts'
 
 export function EventsTab({
@@ -18,22 +20,30 @@ export function EventsTab({
   if (!video) {
     return (
       <EmptyState
-        title="No events"
-        body="Events appear after a video is ingested and the full pipeline completes."
+        title="No event index yet"
+        body="This list is the searchable memory of a video: one row per tracked object, with a caption written at ingest. Upload footage to create it."
         action={
           <Link to="/workspace?tab=video" className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-[#CB2957] border border-[#CB2957]/40 px-4 py-2 rounded-sm transition-all hover:bg-[#CB2957]/10">
             Ingest Footage →
           </Link>
         }
-      />
+      >
+        <ProcessTrail
+          steps={[
+            { title: 'Detect', body: 'YOLO11 boxes on sampled stills.' },
+            { title: 'Caption', body: 'Gemini (or a fallback line) writes the text stored here.' },
+            { title: 'Query later', body: 'Intelligence Query retrieves these rows — it does not invent new events.' },
+          ]}
+        />
+      </EmptyState>
     )
   }
 
   if (status?.status !== 'ready') {
     return (
       <EmptyState
-        title="Still indexing"
-        body="The event index is written at the final pipeline stage. It appears here once status is ready."
+        title="Captions are not written yet"
+        body="This list fills at the last ingest stage. Until then there is no text for search to read."
         action={
           <Link to="/workspace?tab=video" className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-[#CB2957] border border-[#CB2957]/40 px-4 py-2 rounded-sm">
             Watch Pipeline →
@@ -46,8 +56,8 @@ export function EventsTab({
   if (events.length === 0) {
     return (
       <EmptyState
-        title="No events indexed"
-        body="Processing finished but no events were stored for this video. Try re-uploading with a lower YOLO confidence threshold."
+        title="Processing finished with an empty index"
+        body="YOLO did not keep any objects (or they were too small). There is nothing to caption or retrieve. Try a clearer clip, or lower YOLO_CONFIDENCE_THRESHOLD."
       />
     )
   }
@@ -58,6 +68,10 @@ export function EventsTab({
       <div className="mb-6">
         <div className="mb-1 font-mono text-[10px] uppercase tracking-widest text-[#CB2957]">Event Index</div>
         <h1 className="text-2xl font-bold text-[#EEEEEE]">Indexed Events</h1>
+        <p className="mt-2 text-sm text-[#AAAAAA] leading-relaxed max-w-2xl">
+          Each row is a stored event. The sentence is the caption written at ingest. That is the text
+          search reads. The still on the left is the frame that caption describes — not a generated image.
+        </p>
         <p className="mt-2 font-mono text-xs text-[#888888]">
           {events.length} events · {video.video_id} · {video.camera_id}
         </p>
@@ -86,8 +100,8 @@ export function EventsTab({
       {/* Event list */}
       <div className="space-y-px rounded-sm border border-[#1a1a1a] overflow-hidden">
         {events.map((event, i) => {
-          const src = resolveMediaUrl(event.thumbnail_url)
           const captionSource = event.caption_source
+          const sceneCount = event.object_count ?? 1
 
           return (
             <div
@@ -101,10 +115,10 @@ export function EventsTab({
 
               {/* Thumbnail */}
               <div className="shrink-0 relative">
-                {src ? (
+                {event.thumbnail_url ? (
                   <div className="relative overflow-hidden rounded-sm">
-                    <img
-                      src={src}
+                    <AuthenticatedImage
+                      path={event.thumbnail_url}
                       alt={event.caption}
                       className="h-[72px] w-[108px] object-cover border border-[#222222]"
                     />
@@ -125,14 +139,21 @@ export function EventsTab({
 
               {/* Caption & classes */}
               <div className="flex-1 min-w-0 space-y-2">
+                <p className="text-[10px] font-mono uppercase tracking-widest text-[#777777]">
+                  {captionSourceLabel(captionSource)}
+                </p>
                 <p className="text-sm text-[#CCCCCC] leading-relaxed line-clamp-2">{event.caption}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {event.detected_classes.map((cls) => (
                     <Badge key={cls} label={cls} variant="default" />
                   ))}
-                  {captionSource === 'vlm' && (
-                    <Badge label="VLM Caption" variant="accent" />
+                  {sceneCount > 1 && (
+                    <Badge label={`scene ×${sceneCount}`} variant="default" />
                   )}
+                  <Badge
+                    label={captionSourceShort(captionSource)}
+                    variant={captionSource === 'vlm' ? 'accent' : 'default'}
+                  />
                 </div>
                 <div className="font-mono text-[9px] text-[#777777] truncate">{event.event_id}</div>
               </div>

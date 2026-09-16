@@ -1,9 +1,10 @@
+import { AuthenticatedImage } from '../../components/AuthenticatedImage.tsx'
 import { Confidence } from '../../components/Confidence.tsx'
-import { resolveMediaUrl } from '../../lib/api/client.ts'
+import { captionSourceLabel } from '../../lib/pipelineCopy.ts'
 import type { Citation } from '../../types/api.ts'
 
 export function CitationCard({ citation }: { citation: Citation }) {
-  const src = resolveMediaUrl(citation.thumbnail_url)
+  const hasThumb = Boolean(citation.thumbnail_url)
 
   return (
     <article className="group relative flex gap-4 rounded-sm border border-[#1a1a1a] bg-[#050505] p-3 hover:border-[#CB2957]/30 transition-all duration-200">
@@ -12,9 +13,9 @@ export function CitationCard({ citation }: { citation: Citation }) {
 
       {/* Thumbnail */}
       <div className="shrink-0 relative overflow-hidden rounded-sm">
-        {src ? (
-          <img
-            src={src}
+        {hasThumb ? (
+          <AuthenticatedImage
+            path={citation.thumbnail_url}
             alt={`Frame at ${citation.start_timestamp}`}
             className="h-[80px] w-[120px] object-cover border border-[#222222]"
           />
@@ -55,8 +56,10 @@ export function CitationCard({ citation }: { citation: Citation }) {
           <Confidence score={citation.confidence_score} />
         </div>
 
-        {/* Caption */}
-        <p className="text-xs text-[#AAAAAA] leading-relaxed line-clamp-2">{citation.caption}</p>
+        <div className="font-mono text-[9px] uppercase tracking-widest text-[#777777]">
+          {captionSourceLabel(citation.caption_source)}
+        </div>
+        <p className="text-xs text-[#AAAAAA] leading-relaxed line-clamp-3">{citation.caption}</p>
       </div>
     </article>
   )

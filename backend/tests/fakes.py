@@ -14,10 +14,11 @@ def fake_event(video_id: str, camera_id: str) -> EventRecord:
         bounding_boxes=[
             BoundingBox(x=92, y=34, w=58, h=130, frame_timestamp="00:00:18"),
         ],
-        thumbnail_path="./data/thumbnails/vid_test/evt_test01.jpg",
+        thumbnail_path="memory/vid_test/evt_test01.jpg",
         confidence_score=0.91,
         thumbnail_url=f"/api/media/{video_id}/evt_test01.jpg",
         caption_source="rule_based",
+        object_count=1,
     )
 
 

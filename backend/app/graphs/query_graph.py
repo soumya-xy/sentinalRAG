@@ -41,9 +41,11 @@ class QueryState(TypedDict, total=False):
     question: str
     video_id: str
     camera_id: str
+    user_id: str
     events: list[EventRecord]
     retrieved: list[EventRecord]
     answer: str
+    answer_source: str
     citations: list[Citation]
 
 
@@ -69,7 +71,7 @@ def _retrieve(state: QueryState) -> dict[str, list[EventRecord]]:
         state["question"],
         state.get("events") or [],
         video_id=state["video_id"],
-        top_k=3,
+        user_id=state.get("user_id"),
     )
     return {"retrieved": retrieved}
 
@@ -79,17 +81,24 @@ def _compose(state: QueryState) -> dict[str, str]:
     camera_id = state["camera_id"]
     question = state["question"]
     if not retrieved:
-        return {"answer": _fallback_answer(question, retrieved, camera_id)}
+        return {
+            "answer": _fallback_answer(question, retrieved, camera_id),
+            "answer_source": "none",
+        }
 
     llm = get_chat_model()
     if llm is None:
-        return {"answer": _fallback_answer(question, retrieved, camera_id)}
+        return {
+            "answer": _fallback_answer(question, retrieved, camera_id),
+            "answer_source": "extractive",
+        }
 
     context = "\n".join(
         (
             f"- event {event.event_id} | {event.start_timestamp}–{event.end_timestamp} | "
             f"{event.camera_id} | classes={', '.join(event.detected_classes)} | "
-            f"confidence={event.confidence_score:.2f} | {event.caption}"
+            f"scene_count={event.object_count} | confidence={event.confidence_score:.2f} | "
+            f"{event.caption}"
         )
         for event in retrieved
     )
@@ -103,7 +112,7 @@ def _compose(state: QueryState) -> dict[str, str]:
 
     # Build multimodal content for Visual Re-Inspection
     content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
-    for event in retrieved[:2]:
+    for event in retrieved:
         img_b64 = _get_event_image_b64(event)
         if img_b64:
             content.append(
@@ -126,10 +135,13 @@ def _compose(state: QueryState) -> dict[str, str]:
         text = message_text(result.content).strip()
         if not text:
             raise ValueError("empty model answer")
-        return {"answer": text}
+        return {"answer": text, "answer_source": "llm"}
     except Exception as exc:
         logger.warning("LLM compose failed, using extractive fallback: %s", exc)
-        return {"answer": _fallback_answer(question, retrieved, camera_id)}
+        return {
+            "answer": _fallback_answer(question, retrieved, camera_id),
+            "answer_source": "extractive",
+        }
 
 
 def _cite(state: QueryState) -> dict[str, list[Citation]]:
@@ -144,6 +156,7 @@ def _cite(state: QueryState) -> dict[str, list[Citation]]:
             thumbnail_url=event.thumbnail_url,
             confidence_score=event.confidence_score,
             caption=event.caption,
+            caption_source=event.caption_source,
         )
         for event in (state.get("retrieved") or [])
     ]
@@ -178,20 +191,47 @@ def invoke_query_graph(
     video_id: str,
     camera_id: str,
     events: list[EventRecord],
+    user_id: str | None = None,
 ) -> QueryResponse:
     result = _graph().invoke(
         {
             "question": question,
             "video_id": video_id,
             "camera_id": camera_id,
+            "user_id": user_id or "",
             "events": events,
         }
     )
     retrieved = result.get("retrieved") or []
+    answer_source = result.get("answer_source") or ("none" if not retrieved else "extractive")
     return QueryResponse(
         answer=result.get("answer") or _fallback_answer(question, retrieved, camera_id),
         citations=result.get("citations") or [],
         retrieved_event_ids=[event.event_id for event in retrieved],
         video_id=video_id,
         camera_id=camera_id,
+        provenance=_provenance(retrieved, answer_source),
+        answer_source=answer_source,
+    )
+
+
+def _provenance(retrieved: list[EventRecord], answer_source: str) -> str:
+    if not retrieved:
+        return (
+            "Nothing in this video's event index was similar enough. "
+            "The line below is a status message, not a description of the footage."
+        )
+    windows = ", ".join(
+        f"{event.start_timestamp}–{event.end_timestamp}" for event in retrieved[:3]
+    )
+    if answer_source == "llm":
+        return (
+            f"Searched this video's index and retrieved {len(retrieved)} event(s) "
+            f"({windows}). Gemini wrote the answer using only those stored captions "
+            "and the cited frames."
+        )
+    return (
+        f"Searched this video's index and retrieved {len(retrieved)} event(s) "
+        f"({windows}). The model was unavailable, so the answer is the top event's "
+        "stored caption — not a newly invented scene."
     )

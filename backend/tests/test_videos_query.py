@@ -80,3 +80,46 @@ def test_events_before_ready_conflict(client: TestClient) -> None:
     assert upload.json()["status"] == "uploaded"
     events = client.get(f"/api/videos/{video_id}/events", headers=headers)
     assert events.status_code == 409
+
+
+def test_media_requires_auth(client: TestClient) -> None:
+    response = client.get("/api/media/vid_missing/evt_test01.jpg")
+    assert response.status_code == 401
+
+
+def test_media_hides_foreign_or_missing_video(client: TestClient) -> None:
+    headers = _auth(client)
+    response = client.get("/api/media/vid_missing/evt_test01.jpg", headers=headers)
+    assert response.status_code == 404
+
+
+def test_retry_rejected_unless_failed(client: TestClient) -> None:
+    headers = _auth(client)
+    upload = client.post(
+        "/api/videos",
+        headers=headers,
+        files={"file": ("clip.mp4", b"bytes", "video/mp4")},
+    )
+    video_id = upload.json()["video_id"]
+    retry = client.post(f"/api/videos/{video_id}/retry", headers=headers)
+    assert retry.status_code == 409
+
+
+def test_retry_failed_ingest(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("app.api.videos.enqueue_ingest", complete_ingest_for_tests)
+    headers = _auth(client)
+    upload = client.post(
+        "/api/videos",
+        headers=headers,
+        files={"file": ("clip.mp4", b"bytes", "video/mp4")},
+    )
+    video_id = upload.json()["video_id"]
+    from app.services.store import store
+
+    store.fail_pipeline(video_id, "forced failure", failed_key="detect")
+    retry = client.post(f"/api/videos/{video_id}/retry", headers=headers)
+    assert retry.status_code == 200
+    assert retry.json()["status"] == "ready"
+    events = client.get(f"/api/videos/{video_id}/events", headers=headers)
+    assert events.status_code == 200
+    assert events.json()["count"] >= 1

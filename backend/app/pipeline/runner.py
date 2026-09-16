@@ -120,6 +120,7 @@ def run_ingest_pipeline(
                     confidence_score=draft.confidence_score,
                     thumbnail_url=thumbnail_url(video.video_id, draft.event_id, suffix),
                     caption_source=draft.caption_source,
+                    object_count=draft.object_count,
                 )
             )
 

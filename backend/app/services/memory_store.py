@@ -17,6 +17,7 @@ class MemoryCatalog:
         self.revoked_tokens: set[str] = set()
         self.videos: dict[str, VideoInternal] = {}
         self.events_by_video: dict[str, list[EventRecord]] = {}
+        self.embeddings_by_event: dict[str, list[float]] = {}
         self._lock = Lock()
 
     def clear(self) -> None:
@@ -26,6 +27,7 @@ class MemoryCatalog:
             self.revoked_tokens.clear()
             self.videos.clear()
             self.events_by_video.clear()
+            self.embeddings_by_event.clear()
 
     def load(self) -> None:
         return
@@ -150,9 +152,11 @@ class MemoryCatalog:
         events: list[EventRecord],
         embeddings: list[list[float]] | None = None,
     ) -> None:
-        _ = embeddings
         with self._lock:
             self.events_by_video[video_id] = events
+            for index, event in enumerate(events):
+                if embeddings and index < len(embeddings) and embeddings[index]:
+                    self.embeddings_by_event[event.event_id] = embeddings[index]
             video = self.videos.get(video_id)
             if video:
                 video.events_materialized = True
@@ -167,6 +171,32 @@ class MemoryCatalog:
     def get_events(self, video_id: str) -> list[EventRecord]:
         return list(self.events_by_video.get(video_id, []))
 
-    def match_event_ids(self, video_id: str, query_embedding: list[float], top_k: int) -> list[str]:
-        _ = query_embedding
-        return [event.event_id for event in self.get_events(video_id)[:top_k]]
+    def match_events(
+        self,
+        video_id: str,
+        query_embedding: list[float],
+        top_k: int,
+        user_id: str | None = None,
+    ) -> list[tuple[str, float]]:
+        video = self.videos.get(video_id)
+        if video is None:
+            return []
+        if user_id and video.user_id != user_id:
+            return []
+        scored: list[tuple[str, float]] = []
+        for event in self.get_events(video_id):
+            vector = self.embeddings_by_event.get(event.event_id)
+            scored.append((event.event_id, _cosine(query_embedding, vector)))
+        scored.sort(key=lambda item: item[1], reverse=True)
+        return scored[:top_k]
+
+
+def _cosine(query: list[float], vector: list[float] | None) -> float:
+    if not query or not vector or len(query) != len(vector):
+        return 0.0
+    dot = sum(left * right for left, right in zip(query, vector, strict=False))
+    left_norm = sum(value * value for value in query) ** 0.5
+    right_norm = sum(value * value for value in vector) ** 0.5
+    if left_norm < 1e-9 or right_norm < 1e-9:
+        return 0.0
+    return max(0.0, min(1.0, dot / (left_norm * right_norm)))

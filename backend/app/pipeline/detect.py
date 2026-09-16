@@ -41,6 +41,8 @@ class ObjectDetector:
                     continue
                 conf = float(box.conf[0])
                 x1, y1, x2, y2 = (float(v) for v in box.xyxy[0].tolist())
+                width = max(0.0, x2 - x1)
+                height = max(0.0, y2 - y1)
                 detections.append(
                     Detection(
                         frame=frame,
@@ -49,11 +51,11 @@ class ObjectDetector:
                         box=BoundingBox(
                             x=round(x1, 1),
                             y=round(y1, 1),
-                            w=round(max(0.0, x2 - x1), 1),
-                            h=round(max(0.0, y2 - y1), 1),
+                            w=round(width, 1),
+                            h=round(height, 1),
                             frame_timestamp=frame.timestamp_label,
                         ),
-                        interesting=True,
+                        interesting=width * height >= settings.event_min_box_area,
                     )
                 )
 

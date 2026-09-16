@@ -27,4 +27,5 @@ def query_video(body: QueryRequest, user: UserPublic = Depends(get_current_user)
         video_id=video.video_id,
         camera_id=video.camera_id,
         events=events,
+        user_id=user.user_id,
     )

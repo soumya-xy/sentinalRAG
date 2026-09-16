@@ -31,6 +31,7 @@ export interface EventRecord {
   confidence_score: number
   thumbnail_url?: string | null
   caption_source?: string | null
+  object_count?: number
 }
 
 export interface EventListResponse {
@@ -90,6 +91,7 @@ export interface Citation {
   thumbnail_url?: string | null
   confidence_score: number
   caption: string
+  caption_source?: string | null
 }
 
 export interface QueryResponse {
@@ -98,6 +100,8 @@ export interface QueryResponse {
   retrieved_event_ids: string[]
   video_id: string
   camera_id: string
+  provenance?: string | null
+  answer_source?: string | null
 }
 
 export interface HealthResponse {

@@ -8,6 +8,11 @@ import { Input } from '../../components/Input.tsx'
 import { StatusDot, statusToTone } from '../../components/StatusDot.tsx'
 import { api, ApiError } from '../../lib/api/index.ts'
 import { formatBytes } from '../../lib/format.ts'
+import {
+  currentStageHeadline,
+  stageExplanation,
+  stageToneClass,
+} from '../../lib/pipelineCopy.ts'
 import type { PipelineStage, VideoRecord, VideoStatusResponse } from '../../types/api.ts'
 
 function stageTone(state: PipelineStage['state']): 'success' | 'warning' | 'danger' | 'muted' {
@@ -29,6 +34,7 @@ export function VideoTab({
   const [file, setFile] = useState<File | null>(null)
   const [cameraId, setCameraId] = useState('cam-01')
   const [uploading, setUploading] = useState(false)
+  const [retrying, setRetrying] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
 
@@ -63,8 +69,23 @@ export function VideoTab({
     }
   }
 
+  async function onRetry() {
+    if (!video || retrying) return
+    setRetrying(true)
+    setError(null)
+    try {
+      const record = await api.retryIngest(video.video_id)
+      await onUploaded(record)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : 'Retry failed')
+    } finally {
+      setRetrying(false)
+    }
+  }
+
   const isProcessing = video && (status?.status === 'processing' || status?.status === 'uploaded')
   const isReady = status?.status === 'ready'
+  const isFailed = status?.status === 'failed'
 
   return (
     <div className="max-w-2xl px-8 py-8">
@@ -74,8 +95,9 @@ export function VideoTab({
         <div className="mb-1 font-mono text-[10px] uppercase tracking-widest text-[#CB2957]">Footage Ingestion</div>
         <h1 className="text-2xl font-bold text-[#EEEEEE]">Upload CCTV Recording</h1>
         <p className="mt-2 text-sm text-[#AAAAAA] leading-relaxed">
-          Upload any pre-recorded surveillance video. The pipeline will sample frames at 0.8s intervals,
-          run YOLO11 detection, caption events with Gemini Vision, and index embeddings into Supabase pgvector.
+          This is a one-time batch. The file is stored, stills are sampled, YOLO11 labels objects,
+          Gemini writes a caption per event, and those sentences are embedded. Later questions search
+          that caption index — they do not play the video again.
         </p>
       </div>
 
@@ -181,22 +203,42 @@ export function VideoTab({
             {/* Error */}
             {status?.error ? <ErrorBanner message={status.error} /> : null}
 
+            {isFailed && (
+              <div className="flex items-center justify-between gap-3 rounded-sm border border-[#B5533C]/30 bg-[#B5533C]/5 px-4 py-3">
+                <span className="font-mono text-[10px] uppercase tracking-widest text-[#B5533C]">
+                  Ingest failed — the uploaded file is still stored. Retry without re-uploading.
+                </span>
+                <Button type="button" variant="ghost" size="sm" disabled={retrying} onClick={() => void onRetry()}>
+                  {retrying ? 'Retrying…' : 'Retry pipeline'}
+                </Button>
+              </div>
+            )}
+
+            {status && (
+              <p className="text-xs text-[#AAAAAA] leading-relaxed">
+                {currentStageHeadline(status.stages, status.current_stage, status.status)}
+              </p>
+            )}
+
             {/* Pipeline stages */}
             {status?.stages && status.stages.length > 0 && (
               <div className="space-y-0 border border-[#111111] rounded-sm overflow-hidden">
                 {status.stages.map((stage, i) => (
                   <div
                     key={stage.key}
-                    className={`flex items-center gap-4 px-4 py-3 ${i > 0 ? 'border-t border-[#111111]' : ''} ${stage.state === 'running' ? 'bg-[#CB2957]/5' : 'bg-[#030303]'}`}
+                    className={`flex items-start gap-4 px-4 py-3 ${i > 0 ? 'border-t border-[#111111]' : ''} ${stage.state === 'running' ? 'bg-[#CB2957]/5' : 'bg-[#030303]'}`}
                   >
-                    <span className="font-mono text-[10px] text-[#777777] w-5 shrink-0">{String(i + 1).padStart(2, '0')}</span>
+                    <span className="font-mono text-[10px] text-[#777777] w-5 shrink-0 pt-0.5">{String(i + 1).padStart(2, '0')}</span>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <span className={`text-xs ${stage.state === 'running' ? 'text-[#DDDDDD]' : stage.state === 'complete' ? 'text-[#999999]' : 'text-[#777777]'}`}>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className={`text-xs ${stageToneClass(stage.state)}`}>
                           {stage.label}
                         </span>
                         <StatusDot tone={stageTone(stage.state)} label={stage.state} />
                       </div>
+                      <p className="mt-1 text-[11px] text-[#777777] leading-relaxed">
+                        {stageExplanation(stage)}
+                      </p>
                       {stage.state === 'running' && (
                         <div className="mt-2 h-0.5 w-full bg-[#111111] rounded-full overflow-hidden">
                           <div
@@ -220,11 +262,17 @@ export function VideoTab({
             )}
 
             {isReady && (
-              <div className="flex items-center gap-2 rounded-sm border border-[#22c55e]/20 bg-[#22c55e]/5 px-4 py-3">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#22c55e]" />
-                <span className="font-mono text-xs text-[#22c55e] uppercase tracking-widest">
-                  Index ready — query interface unlocked
-                </span>
+              <div className="rounded-sm border border-[#22c55e]/20 bg-[#22c55e]/5 px-4 py-3 space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#22c55e]" />
+                  <span className="font-mono text-xs text-[#22c55e] uppercase tracking-widest">
+                    Index ready
+                  </span>
+                </div>
+                <p className="text-xs text-[#8B9490] leading-relaxed">
+                  Open Intelligence Query. Answers will be built from the captions stored in Event Index,
+                  with those frames as citations.
+                </p>
               </div>
             )}
           </div>
@@ -233,7 +281,7 @@ export function VideoTab({
         <div className="mt-12">
           <EmptyState
             title="No recordings ingested"
-            body="Choose a recorded CCTV file above. The backend will sample frames, run YOLO11, caption events with Gemini Vision, and index them for natural-language queries."
+            body="Choose a recorded CCTV file above. You will see each stage explain itself: store, sample, detect, group, caption, then index. Query stays locked until that last step."
           />
         </div>
       )}

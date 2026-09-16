@@ -16,6 +16,7 @@ class Citation(BaseModel):
     thumbnail_url: str | None = None
     confidence_score: float
     caption: str
+    caption_source: str | None = None
 
 
 class QueryResponse(BaseModel):
@@ -24,3 +25,8 @@ class QueryResponse(BaseModel):
     retrieved_event_ids: list[str]
     video_id: str
     camera_id: str
+    provenance: str | None = None
+    answer_source: str | None = Field(
+        default=None,
+        description="llm | extractive | none — how the answer text was produced",
+    )

@@ -13,7 +13,7 @@ def test_event_schema_requires_phase1_fields() -> None:
         bounding_boxes=[
             BoundingBox(x=92, y=34, w=58, h=130, frame_timestamp="00:14:22"),
         ],
-        thumbnail_path="./data/thumbnails/vid_test/evt_test.svg",
+        thumbnail_path="memory/vid_test/evt_test.svg",
         confidence_score=0.93,
     )
     dumped = event.model_dump()
@@ -28,6 +28,7 @@ def test_event_schema_requires_phase1_fields() -> None:
         "bounding_boxes",
         "thumbnail_path",
         "confidence_score",
+        "object_count",
     ):
         assert key in dumped
         assert dumped[key] is not None

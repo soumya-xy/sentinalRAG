@@ -143,3 +143,16 @@ def get_video(video_id: str, user: UserPublic = Depends(get_current_user)) -> Vi
 def get_video_status(video_id: str, user: UserPublic = Depends(get_current_user)) -> VideoStatusResponse:
     video = owned_video(video_id, user)
     return build_status(video)
+
+
+@router.post("/{video_id}/retry", response_model=VideoRecord)
+def retry_ingest(video_id: str, user: UserPublic = Depends(get_current_user)) -> VideoRecord:
+    video = owned_video(video_id, user)
+    if video.status != "failed":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Retry is only available after a failed ingest.",
+        )
+    enqueue_ingest(video.video_id)
+    refreshed = store.get_video(video_id) or video
+    return to_record(refreshed)

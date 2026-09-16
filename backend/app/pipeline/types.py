@@ -36,4 +36,5 @@ class EventDraft:
     caption: str = ""
     caption_source: str = "rule_based"
     thumbnail_path: str = ""
+    object_count: int = 1
     notes: list[str] = field(default_factory=list)

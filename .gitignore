@@ -27,16 +27,8 @@ frontend/.vite/
 *.onnx
 backend/.model_cache/
 
-# Local runtime data (uploads, frames, chroma)
-data/videos/*
-data/thumbnails/*
-data/frames/*
-data/chroma/*
-data/catalog.json
-!data/videos/.gitkeep
-!data/thumbnails/.gitkeep
-!data/frames/.gitkeep
-!data/chroma/.gitkeep
+# Legacy local store (removed — auth/files/events live in Supabase)
+data/
 
 # OS / editor
 .DS_Store

@@ -48,6 +48,9 @@ export const api = {
 
   listEvents: (videoId: string) => request<EventListResponse>(`/api/videos/${videoId}/events`),
 
+  retryIngest: (videoId: string) =>
+    request<VideoRecord>(`/api/videos/${videoId}/retry`, { method: 'POST' }),
+
   query: (body: QueryRequest) =>
     request<QueryResponse>('/api/query', {
       method: 'POST',

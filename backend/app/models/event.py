@@ -32,6 +32,11 @@ class EventRecord(BaseModel):
         default=None,
         description="vlm | rule_based — which captioner produced the text",
     )
+    object_count: int = Field(
+        default=1,
+        ge=1,
+        description="Max same-class objects visible in this event's time window",
+    )
 
 
 class EventListResponse(BaseModel):

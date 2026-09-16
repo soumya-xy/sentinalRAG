@@ -32,6 +32,16 @@ class Settings(BaseSettings):
     frame_sample_interval_seconds: float = 0.8
     use_scene_change_detection: bool = False
     event_gap_seconds: float = 4.0
+    event_min_box_area: float = 400.0
+    event_iou_min: float = 0.25
+
+    retrieval_top_k: int = 3
+    retrieval_candidate_k: int = 8
+    retrieval_min_similarity: float = 0.48
+    retrieval_vector_weight: float = 0.60
+    retrieval_lexical_weight: float = 0.25
+    retrieval_class_weight: float = 0.10
+    retrieval_confidence_weight: float = 0.05
 
     yolo_model_name: str = "yolo11n.pt"
     yolo_confidence_threshold: float = 0.4

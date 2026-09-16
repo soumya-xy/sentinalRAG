@@ -56,6 +56,7 @@ def _event_from_row(row: dict) -> EventRecord:
             "confidence_score": row["confidence_score"],
             "thumbnail_url": row.get("thumbnail_url"),
             "caption_source": row.get("caption_source"),
+            "object_count": row.get("object_count") or 1,
         }
     )
 
@@ -222,37 +223,71 @@ class SupabaseCatalog:
                 "thumbnail_url": event.thumbnail_url,
                 "confidence_score": event.confidence_score,
                 "caption_source": event.caption_source,
+                "object_count": event.object_count,
             }
             if embeddings and index < len(embeddings) and embeddings[index]:
                 row["embedding"] = embeddings[index]
             rows.append(row)
         if rows:
-            client.table("events").insert(rows).execute()
+            try:
+                client.table("events").insert(rows).execute()
+            except Exception:
+                for row in rows:
+                    row.pop("object_count", None)
+                client.table("events").insert(rows).execute()
         client.table("videos").update(_ready_patch()).eq("video_id", video_id).execute()
 
     def get_events(self, video_id: str) -> list[EventRecord]:
-        result = (
-            get_admin_client()
-            .table("events")
-            .select(
-                "event_id,video_id,camera_id,start_timestamp,end_timestamp,caption,"
-                "detected_classes,bounding_boxes,thumbnail_path,thumbnail_url,"
-                "confidence_score,caption_source"
-            )
-            .eq("video_id", video_id)
-            .order("start_timestamp")
-            .execute()
+        columns = (
+            "event_id,video_id,camera_id,start_timestamp,end_timestamp,caption,"
+            "detected_classes,bounding_boxes,thumbnail_path,thumbnail_url,"
+            "confidence_score,caption_source,object_count"
         )
+        try:
+            result = (
+                get_admin_client()
+                .table("events")
+                .select(columns)
+                .eq("video_id", video_id)
+                .order("start_timestamp")
+                .execute()
+            )
+        except Exception:
+            result = (
+                get_admin_client()
+                .table("events")
+                .select(columns.replace(",object_count", ""))
+                .eq("video_id", video_id)
+                .order("start_timestamp")
+                .execute()
+            )
         return [_event_from_row(row) for row in (result.data or [])]
 
-    def match_event_ids(self, video_id: str, query_embedding: list[float], top_k: int) -> list[str]:
-        result = get_admin_client().rpc(
-            "match_events",
-            {
-                "query_embedding": query_embedding,
-                "filter_video_id": video_id,
-                "match_count": top_k,
-            },
-        ).execute()
+    def match_events(
+        self,
+        video_id: str,
+        query_embedding: list[float],
+        top_k: int,
+        user_id: str | None = None,
+    ) -> list[tuple[str, float]]:
+        client = get_admin_client()
+        params: dict = {
+            "query_embedding": query_embedding,
+            "filter_video_id": video_id,
+            "match_count": top_k,
+        }
+        if user_id:
+            params["filter_user_id"] = user_id
+        try:
+            result = client.rpc("match_events", params).execute()
+        except Exception:
+            params.pop("filter_user_id", None)
+            result = client.rpc("match_events", params).execute()
         rows = result.data or []
-        return [row["event_id"] for row in rows if row.get("event_id")]
+        matched: list[tuple[str, float]] = []
+        for row in rows:
+            event_id = row.get("event_id")
+            if not event_id:
+                continue
+            matched.append((event_id, float(row.get("similarity") or 0.0)))
+        return matched
