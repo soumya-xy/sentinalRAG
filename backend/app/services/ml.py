@@ -75,29 +75,57 @@ def _gemini_embedder_model():
             settings = get_settings()
             if not settings.google_api_key:
                 raise RuntimeError("GOOGLE_API_KEY is required when EMBEDDING_PROVIDER=google")
-            logger.info("Using Gemini embeddings %s", settings.google_embedding_model)
+            model_name = settings.google_embedding_model.replace("models/", "")
+            logger.info("Using Gemini embeddings model=%s", model_name)
             _gemini_embedder = GoogleGenerativeAIEmbeddings(
-                model=settings.google_embedding_model,
+                model=model_name,
                 google_api_key=settings.google_api_key,
             )
         return _gemini_embedder
+
+
+def _fit_dim(vec: list[float], target_dim: int) -> list[float]:
+    if len(vec) == target_dim:
+        return vec
+    if len(vec) > target_dim:
+        return vec[:target_dim]
+    return vec + [0.0] * (target_dim - len(vec))
 
 
 def embed_texts(texts: list[str]) -> list[list[float]]:
     if not texts:
         return []
     settings = get_settings()
+    target_dim = settings.embedding_dimensions
+    raw_embeddings: list[list[float]] = []
+
     if settings.embedding_provider == "google" and settings.google_api_key:
-        return _gemini_embedder_model().embed_documents(texts)
-    return _local_embedder_model().encode(texts).tolist()
+        try:
+            raw_embeddings = _gemini_embedder_model().embed_documents(texts)
+        except Exception as exc:
+            logger.warning("Gemini embed_documents failed, falling back to local embedder: %s", exc)
+
+    if not raw_embeddings:
+        raw_embeddings = _local_embedder_model().encode(texts).tolist()
+
+    return [_fit_dim(vec, target_dim) for vec in raw_embeddings]
 
 
 def embed_query(text: str) -> list[float]:
     settings = get_settings()
+    target_dim = settings.embedding_dimensions
+    raw_vec: list[float] | None = None
+
     if settings.embedding_provider == "google" and settings.google_api_key:
-        return _gemini_embedder_model().embed_query(text)
-    vector = _local_embedder_model().encode([text])
-    return vector[0].tolist()
+        try:
+            raw_vec = _gemini_embedder_model().embed_query(text)
+        except Exception as exc:
+            logger.warning("Gemini embed_query failed, falling back to local embedder: %s", exc)
+
+    if raw_vec is None:
+        raw_vec = _local_embedder_model().encode([text])[0].tolist()
+
+    return _fit_dim(raw_vec, target_dim)
 
 
 def reset_ml_handles() -> None:

@@ -161,14 +161,19 @@ class SupabaseCatalog:
         video.stage_states[key] = state
         video.stage_progress[key] = max(0.0, min(100.0, progress))
         video.current_stage = key
-        video.status = "processing"
+        if state == "complete" and key == STAGE_KEYS[-1]:
+            video.status = "ready"
+            video.events_materialized = True
+        elif not video.events_materialized:
+            video.status = "processing"
         completed = index + 1 if state == "complete" else index
         running = 0.0 if state == "complete" else video.stage_progress[key] / 100.0
         video.overall_progress = round(((completed + running) / len(STAGE_KEYS)) * 100.0, 1)
         get_admin_client().table("videos").update(
             {
                 "status": video.status,
-                "current_stage": video.current_stage,
+                "events_materialized": video.events_materialized,
+                "current_stage": video.current_stage if video.status != "ready" else None,
                 "overall_progress": video.overall_progress,
                 "stage_states": video.stage_states,
                 "stage_progress": video.stage_progress,

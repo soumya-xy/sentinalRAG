@@ -123,7 +123,11 @@ class MemoryCatalog:
             video.stage_states[key] = state
             video.stage_progress[key] = max(0.0, min(100.0, progress))
             video.current_stage = key
-            video.status = "processing"
+            if state == "complete" and key == STAGE_KEYS[-1]:
+                video.status = "ready"
+                video.events_materialized = True
+            elif not video.events_materialized:
+                video.status = "processing"
             completed = index + 1 if state == "complete" else index
             running = 0.0 if state == "complete" else video.stage_progress[key] / 100.0
             video.overall_progress = round(((completed + running) / len(STAGE_KEYS)) * 100.0, 1)

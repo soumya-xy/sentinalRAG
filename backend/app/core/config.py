@@ -29,9 +29,9 @@ class Settings(BaseSettings):
     supabase_videos_bucket: str = "videos"
     supabase_thumbnails_bucket: str = "thumbnails"
 
-    frame_sample_interval_seconds: float = 1.5
+    frame_sample_interval_seconds: float = 0.8
     use_scene_change_detection: bool = False
-    event_gap_seconds: float = 6.0
+    event_gap_seconds: float = 4.0
 
     yolo_model_name: str = "yolo11n.pt"
     yolo_confidence_threshold: float = 0.4
@@ -49,7 +49,7 @@ class Settings(BaseSettings):
 
     embedding_provider: str = "google"
     embedding_model_name: str = "BAAI/bge-m3"
-    google_embedding_model: str = "models/text-embedding-004"
+    google_embedding_model: str = "text-embedding-004"
     embedding_dimensions: int = 768
 
     llm_provider: str = "google"
@@ -58,7 +58,7 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_model: str = "gpt-4o"
     google_api_key: str = ""
-    google_model: str = "gemini-2.0-flash"
+    google_model: str = "gemini-2.5-flash"
     local_llm_endpoint: str = ""
     local_llm_model_name: str = ""
 

@@ -10,12 +10,22 @@ function SessionGate({ children }: { children: ReactNode }) {
   const { ready } = useAuth()
   if (!ready) {
     return (
-      <div className="min-h-screen bg-base px-8 py-8 font-mono text-sm text-muted">
-        Restoring session…
+      <div className="flex min-h-screen items-center justify-center bg-black">
+        <div className="flex flex-col items-center gap-4">
+          <div className="flex h-10 w-10 items-center justify-center rounded-sm bg-[#CB2957]">
+            <svg width="18" height="18" viewBox="0 0 14 14" fill="none">
+              <rect x="0" y="3" width="9" height="8" rx="1.2" fill="white"/>
+              <path d="M9 5.5l4.5-2.5v8l-4.5-2.5V5.5z" fill="white"/>
+            </svg>
+          </div>
+          <span className="font-mono text-[10px] uppercase tracking-widest text-[#888888]">
+            Restoring session…
+          </span>
+        </div>
       </div>
     )
   }
-  return children
+  return <>{children}</>
 }
 
 export default function App() {

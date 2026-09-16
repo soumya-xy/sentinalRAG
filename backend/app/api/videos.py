@@ -12,6 +12,7 @@ from app.pipeline.sampling import probe_video
 from app.services.object_storage import upload_video
 from app.services.processing import build_status, enqueue_ingest
 from app.services.store import VideoInternal, now_utc, store
+from app.services.supabase_client import reset_supabase_clients
 
 router = APIRouter(prefix="/api/videos", tags=["videos"])
 
@@ -86,13 +87,28 @@ async def upload_video_endpoint(
     video_id = f"vid_{uuid4().hex[:10]}"
     filename = f"{video_id}{suffix}"
     if settings.supabase_enabled:
-        stored_path = upload_video(
-            user.user_id,
-            video_id,
-            suffix,
-            payload,
-            CONTENT_TYPES.get(suffix, "application/octet-stream"),
-        )
+        try:
+            stored_path = upload_video(
+                user.user_id,
+                video_id,
+                suffix,
+                payload,
+                CONTENT_TYPES.get(suffix, "application/octet-stream"),
+            )
+        except Exception as exc:
+            reset_supabase_clients()
+            err_str = str(exc)
+            if "413" in err_str or "exceeded" in err_str.lower() or "too large" in err_str.lower():
+                size_mb = len(payload) / (1024 * 1024)
+                raise HTTPException(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail=f"Video file ({size_mb:.1f} MB) exceeds Supabase Storage file size limit. "
+                    "Please upload a smaller video clip or increase the 'Global Max Upload File Size' in Supabase Dashboard -> Storage -> Settings.",
+                ) from exc
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to upload video to Supabase Storage: {err_str}",
+            ) from exc
         duration = _probe_duration(payload, suffix)
     else:
         stored_path = f"memory/{user.user_id}/{filename}"

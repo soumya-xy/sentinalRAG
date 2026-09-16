@@ -12,10 +12,13 @@ from app.services.llm import invoke_gemini_vision, message_text
 logger = logging.getLogger("sentinelrag.caption")
 
 _CAPTION_PROMPT = (
-    "You are captioning a single CCTV still for a retrieval index. "
-    "Write one factual sentence: who/what is visible, clothing or vehicle color if clear, "
-    "and what they appear to be doing. Do not guess identities, intent, or off-screen action. "
-    "If the image is unclear, say so briefly. No preamble."
+    "You are an expert CCTV visual security analyst captioning a frame for a surveillance search index.\n"
+    "Describe the scene in high factual detail:\n"
+    "1. COUNT & PEOPLE: State the number of people visible. Describe clothing colors (jackets, shirts, pants, hats), bags/backpacks, and physical actions (walking, standing, running).\n"
+    "2. VEHICLES: Type (car, truck, bike, motorcycle), color, and motion state if any are present.\n"
+    "3. ENVIRONMENT & TEXT: Any visible signs, building text, or distinctive environment features.\n"
+    "4. SUMMARY: Provide a concise, highly searchable 2-sentence summary.\n"
+    "Be strictly factual. Do not guess intent or off-screen context. No preamble."
 )
 
 

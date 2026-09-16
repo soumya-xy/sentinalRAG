@@ -2,17 +2,39 @@
 
 from __future__ import annotations
 
+import base64
 import logging
-from typing import TypedDict
+from pathlib import Path
+from typing import Any, TypedDict
 
+from langchain_core.messages import HumanMessage
 from langgraph.graph import END, START, StateGraph
 
+from app.core.config import get_settings
 from app.models.event import EventRecord
 from app.models.query import Citation, QueryResponse
 from app.services.llm import get_chat_model, message_text
 from app.services.retrieval import retrieve_events
 
 logger = logging.getLogger("sentinelrag.query")
+
+
+def _get_event_image_b64(event: EventRecord) -> str | None:
+    if not event.thumbnail_path:
+        return None
+    try:
+        settings = get_settings()
+        if settings.supabase_enabled:
+            from app.services.object_storage import download_object
+
+            data = download_object(settings.supabase_thumbnails_bucket, event.thumbnail_path)
+            return base64.b64encode(data).decode("ascii")
+        p = Path(event.thumbnail_path)
+        if p.exists() and p.is_file():
+            return base64.b64encode(p.read_bytes()).decode("ascii")
+    except Exception as exc:
+        logger.debug("Could not load event image b64 for %s: %s", event.event_id, exc)
+    return None
 
 
 class QueryState(TypedDict, total=False):
@@ -72,14 +94,35 @@ def _compose(state: QueryState) -> dict[str, str]:
         for event in retrieved
     )
     prompt = (
-        "Answer the operator question using ONLY the retrieved CCTV events. "
+        "Answer the operator question using ONLY the retrieved CCTV events and attached visual frames. "
         "Name the timestamp window and camera_id in the answer. "
-        "If the events are not enough, say you cannot confirm from the index. "
+        "If the events and visual frames are not enough, say you cannot confirm from the index. "
         "Do not invent people, objects, or times.\n\n"
         f"Events:\n{context}\n\nQuestion: {question}"
     )
+
+    # Build multimodal content for Visual Re-Inspection
+    content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
+    for event in retrieved[:2]:
+        img_b64 = _get_event_image_b64(event)
+        if img_b64:
+            content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"},
+                }
+            )
+
     try:
-        result = llm.invoke(prompt)
+        if len(content) > 1:
+            try:
+                result = llm.invoke([HumanMessage(content=content)])
+            except Exception as mm_exc:
+                logger.info("Multimodal prompt failed, falling back to text-only prompt: %s", mm_exc)
+                result = llm.invoke(prompt)
+        else:
+            result = llm.invoke(prompt)
+
         text = message_text(result.content).strip()
         if not text:
             raise ValueError("empty model answer")

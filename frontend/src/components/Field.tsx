@@ -1,22 +1,21 @@
 import type { ReactNode } from 'react'
 
-export function Field({
-  label,
-  hint,
-  error,
-  children,
-}: {
+interface Props {
   label: string
   hint?: string
   error?: string
   children: ReactNode
-}) {
+}
+
+export function Field({ label, hint, error, children }: Props) {
   return (
-    <label className="block">
-      <span className="mb-1.5 block text-sm text-muted">{label}</span>
+    <div className="space-y-1.5">
+      <label className="block text-xs font-mono uppercase tracking-widest text-[#888888]">
+        {label}
+      </label>
       {children}
-      {hint && !error ? <span className="mt-1.5 block text-sm text-muted">{hint}</span> : null}
-      {error ? <span className="mt-1.5 block text-sm text-critical">{error}</span> : null}
-    </label>
+      {hint && !error && <p className="text-xs text-[#999999] font-mono">{hint}</p>}
+      {error && <p className="text-xs text-[#CB2957] font-mono">{error}</p>}
+    </div>
   )
 }

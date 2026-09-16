@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from app.core.config import get_settings
-from app.services.supabase_client import get_admin_client
+from app.services.supabase_client import get_admin_client, reset_supabase_clients
 
 
 def video_object_key(user_id: str, video_id: str, suffix: str) -> str:
@@ -18,13 +18,27 @@ def thumbnail_object_key(user_id: str, video_id: str, filename: str) -> str:
 
 
 def upload_bytes(bucket: str, key: str, data: bytes, content_type: str) -> str:
-    client = get_admin_client()
-    client.storage.from_(bucket).upload(
-        key,
-        data,
-        {"content-type": content_type, "upsert": "true"},
-    )
-    return key
+    try:
+        client = get_admin_client()
+        client.storage.from_(bucket).upload(
+            key,
+            data,
+            {"content-type": content_type, "upsert": "true"},
+        )
+        return key
+    except Exception as exc:
+        reset_supabase_clients()
+        err_str = str(exc)
+        if "10035" in err_str or "socket" in err_str.lower() or "winerror" in err_str.lower():
+            # Retry once with a fresh client and new connection pool
+            client = get_admin_client()
+            client.storage.from_(bucket).upload(
+                key,
+                data,
+                {"content-type": content_type, "upsert": "true"},
+            )
+            return key
+        raise
 
 
 def upload_video(user_id: str, video_id: str, suffix: str, data: bytes, content_type: str) -> str:
@@ -34,11 +48,15 @@ def upload_video(user_id: str, video_id: str, suffix: str, data: bytes, content_
 
 
 def download_object(bucket: str, key: str) -> bytes:
-    client = get_admin_client()
-    payload = client.storage.from_(bucket).download(key)
-    if isinstance(payload, bytes):
-        return payload
-    return bytes(payload)
+    try:
+        client = get_admin_client()
+        payload = client.storage.from_(bucket).download(key)
+        if isinstance(payload, bytes):
+            return payload
+        return bytes(payload)
+    except Exception:
+        reset_supabase_clients()
+        raise
 
 
 def download_video_to(key: str, dest: Path) -> Path:
