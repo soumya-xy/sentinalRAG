@@ -8,6 +8,7 @@ from app.core.security import hash_password
 from app.models.event import EventRecord
 from app.models.video import VideoStatus
 from app.services.catalog_types import STAGE_KEYS, UserRecord, VideoInternal
+from app.services.embedding_meta import stamp_events
 
 
 class MemoryCatalog:
@@ -153,8 +154,9 @@ class MemoryCatalog:
         embeddings: list[list[float]] | None = None,
     ) -> None:
         with self._lock:
-            self.events_by_video[video_id] = events
-            for index, event in enumerate(events):
+            stamped = stamp_events(events)
+            self.events_by_video[video_id] = stamped
+            for index, event in enumerate(stamped):
                 if embeddings and index < len(embeddings) and embeddings[index]:
                     self.embeddings_by_event[event.event_id] = embeddings[index]
             video = self.videos.get(video_id)

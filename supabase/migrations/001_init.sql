@@ -40,6 +40,8 @@ create table if not exists public.events (
   confidence_score double precision not null,
   caption_source text,
   object_count integer not null default 1,
+  embedding_model text not null default 'text-embedding-004',
+  embedding_model_version text,
   embedding vector(768),
   created_at timestamptz not null default now()
 );

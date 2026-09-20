@@ -32,6 +32,8 @@ export interface EventRecord {
   thumbnail_url?: string | null
   caption_source?: string | null
   object_count?: number
+  embedding_model?: string | null
+  embedding_model_version?: string | null
 }
 
 export interface EventListResponse {

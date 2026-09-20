@@ -9,6 +9,12 @@ from dataclasses import dataclass
 from app.core.config import get_settings
 from app.models.event import EventRecord
 from app.pipeline.geometry import seconds_from_label
+from app.services.embedding_meta import (
+    current_embedding_model,
+    current_embedding_model_version,
+    majority_stored_embedding_model,
+    majority_stored_embedding_version,
+)
 from app.services.ml import embed_query
 from app.services.store import store
 
@@ -244,6 +250,37 @@ def _apply_floor(ranked: list[RankedEvent]) -> list[RankedEvent]:
     return kept
 
 
+def warn_if_embedding_model_mismatch(events: list[EventRecord]) -> None:
+    """Log if the query embedder is not the one that produced most stored vectors."""
+    stored_model = majority_stored_embedding_model(events)
+    if stored_model is None:
+        return
+    query_model = current_embedding_model()
+    if stored_model != query_model:
+        labeled = sum(1 for event in events if event.embedding_model)
+        matching = sum(1 for event in events if event.embedding_model == stored_model)
+        logger.warning(
+            "Query embedding model %r does not match the majority stored model %r "
+            "(%s/%s labeled events). Retrieval quality may degrade until the index is rebuilt.",
+            query_model,
+            stored_model,
+            matching,
+            labeled,
+        )
+        return
+
+    stored_version = majority_stored_embedding_version(events, stored_model)
+    query_version = current_embedding_model_version()
+    if stored_version and query_version and stored_version != query_version:
+        logger.warning(
+            "Query embedding model %r version %r does not match stored version %r. "
+            "Retrieval quality may degrade until the index is rebuilt.",
+            query_model,
+            query_version,
+            stored_version,
+        )
+
+
 def retrieve_events(
     question: str,
     events: list[EventRecord],
@@ -260,6 +297,7 @@ def retrieve_events(
     scoped = [event for event in events if not video_id or event.video_id == video_id]
     if not scoped:
         return []
+    warn_if_embedding_model_mismatch(scoped)
 
     window = parse_time_filter(question, scoped)
     filtered = [event for event in scoped if window is None or _event_overlaps_window(event, window)]

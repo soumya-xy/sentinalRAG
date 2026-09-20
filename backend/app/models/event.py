@@ -37,6 +37,14 @@ class EventRecord(BaseModel):
         ge=1,
         description="Max same-class objects visible in this event's time window",
     )
+    embedding_model: str | None = Field(
+        default=None,
+        description="Embedder that produced events.embedding, from app config at write time",
+    )
+    embedding_model_version: str | None = Field(
+        default=None,
+        description="Optional provider-specific embedder version; unset when the model id is enough",
+    )
 
 
 class EventListResponse(BaseModel):

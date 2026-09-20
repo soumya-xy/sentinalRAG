@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from app.models.event import EventRecord
 from app.models.video import VideoStatus
 from app.services.catalog_types import STAGE_KEYS, VideoInternal
+from app.services.embedding_meta import current_embedding_model, current_embedding_model_version
 from app.services.supabase_client import get_admin_client
 
 
@@ -57,6 +58,8 @@ def _event_from_row(row: dict) -> EventRecord:
             "thumbnail_url": row.get("thumbnail_url"),
             "caption_source": row.get("caption_source"),
             "object_count": row.get("object_count") or 1,
+            "embedding_model": row.get("embedding_model"),
+            "embedding_model_version": row.get("embedding_model_version"),
         }
     )
 
@@ -206,6 +209,8 @@ class SupabaseCatalog:
         if video is None:
             raise RuntimeError(f"Cannot index events; video {video_id} is missing")
         user_id = video.user_id
+        embedding_model = current_embedding_model()
+        embedding_model_version = current_embedding_model_version()
         client.table("events").delete().eq("video_id", video_id).execute()
         rows = []
         for index, event in enumerate(events):
@@ -224,7 +229,10 @@ class SupabaseCatalog:
                 "confidence_score": event.confidence_score,
                 "caption_source": event.caption_source,
                 "object_count": event.object_count,
+                "embedding_model": embedding_model,
             }
+            if embedding_model_version:
+                row["embedding_model_version"] = embedding_model_version
             if embeddings and index < len(embeddings) and embeddings[index]:
                 row["embedding"] = embeddings[index]
             rows.append(row)
@@ -234,6 +242,8 @@ class SupabaseCatalog:
             except Exception:
                 for row in rows:
                     row.pop("object_count", None)
+                    row.pop("embedding_model", None)
+                    row.pop("embedding_model_version", None)
                 client.table("events").insert(rows).execute()
         client.table("videos").update(_ready_patch()).eq("video_id", video_id).execute()
 
@@ -241,7 +251,7 @@ class SupabaseCatalog:
         columns = (
             "event_id,video_id,camera_id,start_timestamp,end_timestamp,caption,"
             "detected_classes,bounding_boxes,thumbnail_path,thumbnail_url,"
-            "confidence_score,caption_source,object_count"
+            "confidence_score,caption_source,object_count,embedding_model,embedding_model_version"
         )
         try:
             result = (
@@ -253,10 +263,15 @@ class SupabaseCatalog:
                 .execute()
             )
         except Exception:
+            fallback = (
+                columns.replace(",object_count", "")
+                .replace(",embedding_model_version", "")
+                .replace(",embedding_model", "")
+            )
             result = (
                 get_admin_client()
                 .table("events")
-                .select(columns.replace(",object_count", ""))
+                .select(fallback)
                 .eq("video_id", video_id)
                 .order("start_timestamp")
                 .execute()

@@ -22,7 +22,7 @@ You do **not** need a separate database URL. The service role key can read/write
 ## One-time Supabase setup
 
 1. Auth → Providers → Email: turn **Confirm email** **off** while you develop (otherwise register returns no session).
-2. SQL Editor: run [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql). If that file was already applied earlier, also run [`supabase/migrations/002_retrieval_and_event_quality.sql`](supabase/migrations/002_retrieval_and_event_quality.sql) and [`supabase/migrations/003_add_hnsw_index.sql`](supabase/migrations/003_add_hnsw_index.sql). That creates:
+2. SQL Editor: run [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql). If that file was already applied earlier, also run [`supabase/migrations/002_retrieval_and_event_quality.sql`](supabase/migrations/002_retrieval_and_event_quality.sql), [`supabase/migrations/003_add_hnsw_index.sql`](supabase/migrations/003_add_hnsw_index.sql), and [`supabase/migrations/004_embedding_model.sql`](supabase/migrations/004_embedding_model.sql). That creates:
    - `vector` extension
    - `videos` and `events` tables (`events.embedding vector(768)`)
    - HNSW index on `events.embedding` (`vector_cosine_ops`)
@@ -67,7 +67,7 @@ Tests force an empty Supabase config and use an in-memory catalog. They never wr
 | Uploaded videos | Supabase Storage `videos/{user_id}/{video_id}.mp4` |
 | Event thumbnails | Supabase Storage `thumbnails/{user_id}/{video_id}/{event_id}.jpg` |
 | Video status + event captions | Supabase table `videos` / `events` |
-| Caption vectors | `events.embedding` (pgvector, 768-d Gemini embeddings) |
+| Caption vectors | `events.embedding` (pgvector, 768-d Gemini embeddings) plus `embedding_model` |
 | YOLO weights | Local `yolo11n.pt` only (model file, not user data) |
 | Sampled frames | OS temp dir, deleted when ingest finishes |
 

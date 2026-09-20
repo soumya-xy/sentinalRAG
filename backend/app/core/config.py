@@ -60,6 +60,7 @@ class Settings(BaseSettings):
     embedding_provider: str = "google"
     embedding_model_name: str = "BAAI/bge-m3"
     google_embedding_model: str = "text-embedding-004"
+    embedding_model_version: str = ""
     embedding_dimensions: int = 768
 
     llm_provider: str = "google"
@@ -96,6 +97,19 @@ class Settings(BaseSettings):
     @property
     def yolo_allowed_classes(self) -> set[str]:
         return {item.strip() for item in self.yolo_class_filter.split(",") if item.strip()}
+
+    @property
+    def active_embedding_model(self) -> str:
+        """Model id written onto event rows and used for query embeddings."""
+        if (self.embedding_provider or "google").lower() == "google":
+            return self.google_embedding_model.replace("models/", "")
+        return self.embedding_model_name
+
+    @property
+    def active_embedding_model_version(self) -> str | None:
+        """Optional extra version when a provider versions separately from the model id."""
+        value = (self.embedding_model_version or "").strip()
+        return value or None
 
     def resolve_yolo_weights(self) -> str:
         name = self.yolo_model_name
