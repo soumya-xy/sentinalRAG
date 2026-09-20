@@ -88,21 +88,20 @@ export function VideoTab({
   const isFailed = status?.status === 'failed'
 
   return (
-    <div className="max-w-2xl px-8 py-8">
+    <div className="max-w-2xl px-6 py-6 font-sans">
 
       {/* Section header */}
-      <div className="mb-6">
-        <div className="mb-1 font-mono text-[10px] uppercase tracking-widest text-[#CB2957]">Footage Ingestion</div>
-        <h1 className="text-2xl font-bold text-[#EEEEEE]">Upload CCTV Recording</h1>
-        <p className="mt-2 text-sm text-[#AAAAAA] leading-relaxed">
+      <div className="mb-5 space-y-1">
+        <div className="text-xs font-bold uppercase tracking-wider text-[#CB2957]">Footage Ingestion</div>
+        <h1 className="text-2xl font-bold text-white">Upload CCTV Recording</h1>
+        <p className="text-xs sm:text-sm text-[#CCCCCC] leading-relaxed">
           This is a one-time batch. The file is stored, stills are sampled, YOLO11 labels objects,
-          Gemini writes a caption per event, and those sentences are embedded. Later questions search
-          that caption index — they do not play the video again.
+          Gemini writes a caption per event, and those sentences are embedded into Supabase pgvector.
         </p>
       </div>
 
       {/* Upload form */}
-      <form onSubmit={onSubmit} className="space-y-5">
+      <form onSubmit={onSubmit} className="space-y-4">
         {error ? <ErrorBanner message={error} /> : null}
 
         {/* Drop zone */}
@@ -111,14 +110,14 @@ export function VideoTab({
           onDragLeave={() => setDragOver(false)}
           onDrop={onDrop}
           className={[
-            'group relative flex cursor-pointer flex-col items-center justify-center rounded-sm border-2 border-dashed px-8 py-14 transition-all duration-200',
+            'group relative flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-10 transition-all duration-200',
             dragOver
               ? 'border-[#CB2957] bg-[#CB2957]/5'
-              : 'border-[#222222] bg-[#050505] hover:border-[#CB2957]/50 hover:bg-[#CB2957]/3',
+              : 'border-[#2c2c2c] bg-[#050505] hover:border-[#CB2957]/50 hover:bg-[#CB2957]/3',
           ].join(' ')}
         >
-          <div className={`mb-4 flex h-12 w-12 items-center justify-center rounded-sm border transition-colors ${dragOver ? 'border-[#CB2957]/60 bg-[#CB2957]/10' : 'border-[#222222] bg-[#0a0a0a] group-hover:border-[#CB2957]/40'}`}>
-            <svg width="22" height="22" viewBox="0 0 22 22" fill="none" className={`transition-colors ${dragOver ? 'text-[#CB2957]' : 'text-[#888888] group-hover:text-[#AAAAAA]'}`}>
+          <div className={`mb-3 flex h-11 w-11 items-center justify-center rounded-lg border transition-colors ${dragOver ? 'border-[#CB2957]/60 bg-[#CB2957]/10' : 'border-[#262626] bg-[#0a0a0a] group-hover:border-[#CB2957]/40'}`}>
+            <svg width="20" height="20" viewBox="0 0 22 22" fill="none" className={`transition-colors ${dragOver ? 'text-[#CB2957]' : 'text-[#CCCCCC] group-hover:text-white'}`}>
               <rect x="2" y="6" width="14" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
               <path d="M16 10l5.5-3.5v11L16 14" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
               <path d="M9 13V7m-2 2l2-2 2 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -127,16 +126,16 @@ export function VideoTab({
 
           {file ? (
             <div className="text-center">
-              <div className="font-mono text-sm text-[#DDDDDD]">{file.name}</div>
+              <div className="font-mono text-xs sm:text-sm text-[#EEEEEE] font-semibold">{file.name}</div>
               <div className="mt-1 font-mono text-xs text-[#CB2957]">{formatBytes(file.size)}</div>
-              <div className="mt-2 font-mono text-[10px] text-[#888888]">Click to change file</div>
+              <div className="mt-1.5 font-sans text-xs text-[#AAAAAA]">Click to change file</div>
             </div>
           ) : (
-            <div className="text-center">
-              <div className="text-sm text-[#888888]">
-                {dragOver ? 'Drop footage here' : 'Drag & drop footage or click to browse'}
+            <div className="text-center space-y-1">
+              <div className="text-xs sm:text-sm font-medium text-[#EEEEEE]">
+                {dragOver ? 'Drop footage here' : 'Drag & drop CCTV recording or click to browse'}
               </div>
-              <div className="mt-2 font-mono text-[10px] text-[#888888] uppercase tracking-widest">
+              <div className="font-mono text-[10px] text-[#AAAAAA] uppercase tracking-wider">
                 MP4 · MOV · MKV · AVI · WEBM
               </div>
             </div>
@@ -150,14 +149,14 @@ export function VideoTab({
             value={cameraId}
             onChange={(e) => setCameraId(e.target.value)}
             placeholder="cam-01"
-            className="max-w-xs font-mono"
+            className="max-w-xs font-mono text-xs"
           />
         </Field>
 
-        <Button type="submit" disabled={uploading || !file}>
+        <Button type="submit" disabled={uploading || !file} size="md" className="font-semibold text-xs">
           {uploading ? (
             <>
-              <span className="h-1.5 w-1.5 rounded-full bg-white pulse-dot" />
+              <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
               Uploading & Processing…
             </>
           ) : (
@@ -168,20 +167,20 @@ export function VideoTab({
 
       {/* Active video status */}
       {video ? (
-        <section className="mt-12 space-y-4">
+        <section className="mt-10 space-y-3">
           {/* Divider */}
           <div className="flex items-center gap-3">
-            <div className="h-px flex-1 bg-[#1a1a1a]" />
-            <span className="font-mono text-[9px] uppercase tracking-widest text-[#777777]">Active Recording</span>
-            <div className="h-px flex-1 bg-[#1a1a1a]" />
+            <div className="h-px flex-1 bg-[#1f1f1f]" />
+            <span className="font-mono text-[10px] uppercase tracking-wider text-[#AAAAAA]">Active Recording Stream</span>
+            <div className="h-px flex-1 bg-[#1f1f1f]" />
           </div>
 
-          <div className="rounded-sm border border-[#1a1a1a] bg-[#050505] p-5 space-y-4">
+          <div className="rounded-lg border border-[#222222] bg-[#080808] p-4 space-y-3">
             {/* File info */}
             <div className="flex items-start justify-between">
               <div>
-                <div className="font-mono text-sm text-[#DDDDDD]">{video.original_filename}</div>
-                <div className="mt-1 font-mono text-xs text-[#888888]">
+                <div className="font-mono text-xs sm:text-sm font-semibold text-[#EEEEEE]">{video.original_filename}</div>
+                <div className="mt-0.5 font-mono text-xs text-[#AAAAAA]">
                   {formatBytes(video.size_bytes)}
                   {video.duration_seconds ? ` · ${video.duration_seconds.toFixed(1)}s` : ''}
                 </div>
@@ -194,7 +193,7 @@ export function VideoTab({
             </div>
 
             {/* IDs */}
-            <div className="font-mono text-[10px] text-[#777777] space-x-3">
+            <div className="font-mono text-[10px] text-[#AAAAAA] space-x-2 bg-[#111111] px-2.5 py-1 rounded border border-[#222222] inline-block">
               <span>{video.video_id}</span>
               <span>·</span>
               <span>{video.camera_id}</span>
@@ -204,9 +203,9 @@ export function VideoTab({
             {status?.error ? <ErrorBanner message={status.error} /> : null}
 
             {isFailed && (
-              <div className="flex items-center justify-between gap-3 rounded-sm border border-[#B5533C]/30 bg-[#B5533C]/5 px-4 py-3">
-                <span className="font-mono text-[10px] uppercase tracking-widest text-[#B5533C]">
-                  Ingest failed — the uploaded file is still stored. Retry without re-uploading.
+              <div className="flex items-center justify-between gap-3 rounded-md border border-[#ef4444]/30 bg-[#ef4444]/10 px-3.5 py-2.5">
+                <span className="font-sans text-xs text-[#ef4444]">
+                  Ingest failed — file stored. You can retry pipeline without re-uploading.
                 </span>
                 <Button type="button" variant="ghost" size="sm" disabled={retrying} onClick={() => void onRetry()}>
                   {retrying ? 'Retrying…' : 'Retry pipeline'}
@@ -215,32 +214,32 @@ export function VideoTab({
             )}
 
             {status && (
-              <p className="text-xs text-[#AAAAAA] leading-relaxed">
+              <p className="text-xs text-[#CCCCCC] leading-relaxed">
                 {currentStageHeadline(status.stages, status.current_stage, status.status)}
               </p>
             )}
 
             {/* Pipeline stages */}
             {status?.stages && status.stages.length > 0 && (
-              <div className="space-y-0 border border-[#111111] rounded-sm overflow-hidden">
+              <div className="space-y-0 border border-[#222222] rounded-md overflow-hidden">
                 {status.stages.map((stage, i) => (
                   <div
                     key={stage.key}
-                    className={`flex items-start gap-4 px-4 py-3 ${i > 0 ? 'border-t border-[#111111]' : ''} ${stage.state === 'running' ? 'bg-[#CB2957]/5' : 'bg-[#030303]'}`}
+                    className={`flex items-start gap-3.5 px-3.5 py-2.5 ${i > 0 ? 'border-t border-[#181818]' : ''} ${stage.state === 'running' ? 'bg-[#CB2957]/10' : 'bg-[#030303]'}`}
                   >
-                    <span className="font-mono text-[10px] text-[#777777] w-5 shrink-0 pt-0.5">{String(i + 1).padStart(2, '0')}</span>
+                    <span className="font-mono text-[10px] text-[#888888] w-4 shrink-0 pt-0.5">{String(i + 1).padStart(2, '0')}</span>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className={`text-xs ${stageToneClass(stage.state)}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`text-xs font-semibold ${stageToneClass(stage.state)}`}>
                           {stage.label}
                         </span>
                         <StatusDot tone={stageTone(stage.state)} label={stage.state} />
                       </div>
-                      <p className="mt-1 text-[11px] text-[#777777] leading-relaxed">
+                      <p className="mt-0.5 text-xs text-[#AAAAAA] leading-relaxed">
                         {stageExplanation(stage)}
                       </p>
                       {stage.state === 'running' && (
-                        <div className="mt-2 h-0.5 w-full bg-[#111111] rounded-full overflow-hidden">
+                        <div className="mt-2 h-1 w-full bg-[#181818] rounded-full overflow-hidden">
                           <div
                             className="h-full bg-[#CB2957] transition-all duration-500"
                             style={{ width: `${stage.progress}%` }}
@@ -256,32 +255,31 @@ export function VideoTab({
             {/* Overall progress */}
             {status && (
               <div className="flex items-center justify-between">
-                <span className="font-mono text-[9px] uppercase tracking-widest text-[#777777]">Overall Progress</span>
-                <span className="font-mono text-xs text-[#CB2957]">{status.progress.toFixed(0)}%</span>
+                <span className="font-sans text-xs font-semibold uppercase tracking-wider text-[#AAAAAA]">Overall Progress</span>
+                <span className="font-mono text-xs font-bold text-[#CB2957]">{status.progress.toFixed(0)}%</span>
               </div>
             )}
 
             {isReady && (
-              <div className="rounded-sm border border-[#22c55e]/20 bg-[#22c55e]/5 px-4 py-3 space-y-1">
+              <div className="rounded-md border border-[#22c55e]/30 bg-[#22c55e]/10 px-3.5 py-2.5 space-y-1">
                 <div className="flex items-center gap-2">
                   <span className="h-1.5 w-1.5 rounded-full bg-[#22c55e]" />
-                  <span className="font-mono text-xs text-[#22c55e] uppercase tracking-widest">
-                    Index ready
+                  <span className="font-sans text-xs font-semibold text-[#22c55e] uppercase tracking-wider">
+                    Index Ready
                   </span>
                 </div>
-                <p className="text-xs text-[#8B9490] leading-relaxed">
-                  Open Intelligence Query. Answers will be built from the captions stored in Event Index,
-                  with those frames as citations.
+                <p className="text-xs text-[#DDDDDD] leading-relaxed">
+                  Open Intelligence Query to start asking questions grounded to stored captions and visual evidence frames.
                 </p>
               </div>
             )}
           </div>
         </section>
       ) : (
-        <div className="mt-12">
+        <div className="mt-8">
           <EmptyState
             title="No recordings ingested"
-            body="Choose a recorded CCTV file above. You will see each stage explain itself: store, sample, detect, group, caption, then index. Query stays locked until that last step."
+            body="Choose a recorded CCTV file above. You will see each stage explain itself: store, sample, detect, group, caption, then index."
           />
         </div>
       )}

@@ -89,16 +89,16 @@ export function ConversationTab({
         title="Nothing to ask yet"
         body="Questions search an index of captions, not the raw video. Upload footage first so YOLO, Gemini, and pgvector can build that index."
         action={
-          <Link to="/workspace?tab=video" className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-[#CB2957] hover:text-[#e0325f] border border-[#CB2957]/40 px-4 py-2 rounded-sm transition-all">
+          <Link to="/workspace?tab=video" className="inline-flex items-center gap-2 font-sans text-xs font-semibold uppercase tracking-wider text-[#CB2957] hover:text-[#e0325f] border border-[#CB2957]/40 px-4 py-2 rounded-md transition-all">
             Ingest Footage →
           </Link>
         }
       >
         <ProcessTrail
           steps={[
-            { title: 'Upload a clip', body: 'The file is stored in Supabase. Nothing user-specific stays on this machine.' },
-            { title: 'Index is built', body: 'YOLO finds objects, Gemini writes captions, those sentences are embedded.' },
-            { title: 'Then you ask', body: 'The answer is composed only from retrieved captions and their frames.' },
+            { title: 'Upload a clip', body: 'The file is stored securely in Supabase Storage.' },
+            { title: 'Index is built', body: 'YOLO finds objects, Gemini writes captions, vectors are embedded.' },
+            { title: 'Then you ask', body: 'Answers are composed from retrieved captions and candidate frames.' },
           ]}
         />
       </EmptyState>
@@ -111,15 +111,15 @@ export function ConversationTab({
         title="Index is still being written"
         body={currentStageHeadline(status?.stages, status?.current_stage, status?.status)}
         action={
-          <Link to="/workspace?tab=video" className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-[#CB2957] hover:text-[#e0325f] border border-[#CB2957]/40 px-4 py-2 rounded-sm transition-all">
+          <Link to="/workspace?tab=video" className="inline-flex items-center gap-2 font-sans text-xs font-semibold uppercase tracking-wider text-[#CB2957] hover:text-[#e0325f] border border-[#CB2957]/40 px-4 py-2 rounded-md transition-all">
             Watch Pipeline →
           </Link>
         }
       >
         <ProcessTrail
           steps={[
-            { title: 'Now', body: 'Frames are being turned into events and captions. That text is not on this screen yet.' },
-            { title: 'Next', body: 'When status is ready, those captions become the only source for answers.' },
+            { title: 'Now', body: 'Frames are being turned into events and captions.' },
+            { title: 'Next', body: 'When status is ready, those captions become searchable.' },
           ]}
         />
       </EmptyState>
@@ -130,9 +130,9 @@ export function ConversationTab({
     return (
       <EmptyState
         title="No index to query"
-        body={status.error ?? 'Ingest stopped before captions were written. Retry the same file from Ingest Footage — there is nothing here to search.'}
+        body={status.error ?? 'Ingest stopped before captions were written. Retry from Ingest Footage.'}
         action={
-          <Link to="/workspace?tab=video" className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-[#CB2957] border border-[#CB2957]/40 px-4 py-2 rounded-sm">
+          <Link to="/workspace?tab=video" className="inline-flex items-center gap-2 font-sans text-xs font-semibold uppercase tracking-wider text-[#CB2957] border border-[#CB2957]/40 px-4 py-2 rounded-md">
             Retry on Ingest
           </Link>
         }
@@ -142,50 +142,51 @@ export function ConversationTab({
 
   /* ── Main Chat UI ────────────────────────────────────────── */
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col font-sans">
 
       {/* Feed metadata banner */}
-      <div className="border-b border-[#111111] bg-[#030303] px-8 py-3 flex items-center gap-6 shrink-0">
-        <div className="flex items-center gap-2">
-          <span className="h-1.5 w-1.5 rounded-full bg-[#22c55e] pulse-dot" />
-          <span className="font-mono text-[10px] uppercase tracking-widest text-[#22c55e]">Index Ready</span>
+      <div className="border-b border-[#1f1f1f] bg-[#050505] px-6 py-2.5 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 bg-[#22c55e]/10 border border-[#22c55e]/20 px-2.5 py-0.5 rounded-full">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#22c55e] animate-pulse" />
+            <span className="text-[11px] font-semibold text-[#22c55e] uppercase tracking-wider">Index Ready</span>
+          </div>
+          <span className="text-xs font-medium text-[#DDDDDD]">
+            📹 {video.camera_id} <span className="text-[#AAAAAA]">({video.original_filename})</span>
+          </span>
         </div>
-        <span className="font-mono text-[10px] text-[#777777] uppercase tracking-widest">
-          {video.camera_id} · {video.video_id}
-        </span>
         {status?.caption_mode && (
-          <span className="font-mono text-[10px] text-[#777777] uppercase tracking-widest">
-            Captions: {status.caption_mode === 'vlm' ? 'Gemini vision' : 'rule-based'}
+          <span className="text-[11px] font-medium text-[#CCCCCC] bg-[#111111] px-2.5 py-0.5 rounded border border-[#222222]">
+            Captions: {status.caption_mode === 'vlm' ? 'Gemini 2.5 Vision' : 'Rule-based'}
           </span>
         )}
       </div>
-      <div className="border-b border-[#111111] bg-[#050505] px-8 py-2.5 shrink-0">
-        <p className="text-xs text-[#888888] leading-relaxed">
-          A question is embedded, matched against this video’s event captions, then answered only from those hits.
-          The paragraph you see is not a free-form watch of the file.
+
+      <div className="border-b border-[#181818] bg-[#080808] px-6 py-2 shrink-0">
+        <p className="text-xs text-[#CCCCCC] leading-relaxed">
+          Questions are matched against indexed event captions, then answered with visual evidence citations.
         </p>
       </div>
 
       {/* Conversation scroll area */}
-      <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
+      <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
         {turns.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center text-center py-12">
-            <div className="mb-6 h-12 w-12 rounded-sm border border-[#1a1a1a] bg-[#050505] flex items-center justify-center">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-[#CB2957]">
-                <circle cx="10" cy="10" r="8.5" stroke="currentColor" strokeWidth="1.2"/>
-                <path d="M10 6v5l3 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+          <div className="flex h-full flex-col items-center justify-center text-center py-10">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-[#222222] bg-[#0c0c0c]">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-[#CB2957]">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5"/>
+                <path d="M12 7v5l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
               </svg>
             </div>
-            <p className="font-mono text-xs uppercase tracking-widest text-[#777777] mb-2">Ready to search the index</p>
-            <p className="text-xs text-[#888888] max-w-md leading-relaxed">
-              Type a question about people, clothing, vehicles, or time. The system will retrieve stored events first.
-              The answer appears only after that retrieval — and the frames under it are the events it used.
+            <h3 className="text-base font-semibold text-[#EEEEEE] mb-1">Ready to query surveillance footage</h3>
+            <p className="text-xs text-[#CCCCCC] max-w-md leading-relaxed">
+              Ask about people, clothing, vehicles, objects, or timestamps. Responses pull directly from stored events.
             </p>
             <ProcessTrail
               steps={[
-                { title: 'Retrieve', body: 'Your question is compared to caption embeddings for this video only.' },
-                { title: 'Compose', body: 'Gemini writes a short answer from those captions and frames.' },
-                { title: 'Cite', body: 'Each card below the answer is an indexed event, not a new image generation.' },
+                { title: 'Retrieve', body: 'Question is matched to stored caption vector embeddings.' },
+                { title: 'Inspect & Compose', body: 'Gemini visually inspects candidate frames to compose an accurate answer.' },
+                { title: 'Cite', body: 'Every response links directly to timestamped CCTV evidence frames.' },
               ]}
             />
           </div>
@@ -194,75 +195,70 @@ export function ConversationTab({
             <article key={turn.id} className="reveal space-y-4">
               {/* Question */}
               <div className="flex items-start gap-3">
-                <div className="shrink-0 flex h-6 w-6 items-center justify-center rounded-sm bg-[#1a1a1a] border border-[#222222]">
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="text-[#AAAAAA]">
-                    <circle cx="5" cy="3.5" r="1.8" stroke="currentColor" strokeWidth="0.9"/>
-                    <path d="M1 9c0-2.2 1.8-3.5 4-3.5s4 1.3 4 3.5" stroke="currentColor" strokeWidth="0.9"/>
-                  </svg>
+                <div className="shrink-0 flex h-7 w-7 items-center justify-center rounded-full bg-[#181818] border border-[#2c2c2c] text-xs text-[#DDDDDD] font-semibold">
+                  👤
                 </div>
                 <div className="flex-1">
-                  <div className="font-mono text-[9px] uppercase tracking-widest text-[#888888] mb-1">Operator Query</div>
-                  <p className="text-sm text-[#DDDDDD]">{turn.question}</p>
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-[#AAAAAA] mb-1">Operator Query</div>
+                  <p className="text-sm text-[#EEEEEE] font-medium bg-[#0a0a0a] p-3 rounded-lg border border-[#222222] inline-block">{turn.question}</p>
                 </div>
               </div>
 
               {/* Answer */}
               {turn.pending ? (
-                <div className="ml-9 space-y-3">
-                  <div className="flex items-center gap-2 py-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#CB2957] pulse-dot" />
-                    <span className="font-mono text-xs text-[#999999] uppercase tracking-widest">Working through the index</span>
+                <div className="ml-10 space-y-2.5">
+                  <div className="flex items-center gap-2 py-1.5">
+                    <span className="h-2 w-2 rounded-full bg-[#CB2957] animate-ping" />
+                    <span className="text-xs font-semibold text-[#DDDDDD] uppercase tracking-wider">Searching Vector Index & Inspecting Frames…</span>
                   </div>
-                  <ProcessTrail
-                    steps={[
-                      { title: 'Embed question', body: 'Same embedding model as the stored captions.' },
-                      { title: 'Retrieve events', body: 'Only this video. Weak matches are dropped.' },
-                      { title: 'Compose + cite', body: 'Answer text is written after retrieval, then attached to those events.' },
-                    ]}
-                  />
                 </div>
               ) : turn.response ? (
-                <div className="ml-9 space-y-4 reveal">
-                  <ProvenanceNote label="Where this answer came from">
+                <div className="ml-10 space-y-4 reveal">
+                  <ProvenanceNote label="Answer Source Provenance">
                     {turn.response.provenance
-                      ?? 'Retrieved indexed events for this video, then composed the answer from those rows.'}
+                      ?? 'Retrieved matching event captions, inspected image frames, and composed grounded answer.'}
                   </ProvenanceNote>
-                  <div>
-                    <div className="font-mono text-[9px] uppercase tracking-widest text-[#CB2957] mb-2">
-                      {answerSourceLabel(turn.response.answer_source)}
+                  <div className="bg-[#080808] p-4 rounded-lg border border-[#222222] space-y-2">
+                    <div className="flex items-center justify-between border-b border-[#1a1a1a] pb-1.5">
+                      <div className="text-xs font-bold uppercase tracking-wider text-[#CB2957] flex items-center gap-1.5">
+                        <span>🎯</span>
+                        <span>{answerSourceLabel(turn.response.answer_source)}</span>
+                      </div>
                     </div>
-                    <p className="text-sm text-[#DDDDDD] leading-relaxed border-l-2 border-[#CB2957]/30 pl-4">
+                    <p className="text-sm text-[#EEEEEE] leading-relaxed">
                       {turn.response.answer}
                     </p>
                   </div>
+
                   {turn.response.citations.length > 0 ? (
-                    <div>
-                      <div className="font-mono text-[9px] uppercase tracking-widest text-[#888888] mb-1">
-                        Evidence from the index ({turn.response.citations.length})
+                    <div className="space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs font-bold uppercase tracking-wider text-[#CCCCCC] flex items-center gap-1.5">
+                          <span>📸</span>
+                          <span>Visual Evidence Citations ({turn.response.citations.length})</span>
+                        </div>
+                        <span className="text-[11px] text-[#AAAAAA]">Click thumbnail to zoom image</span>
                       </div>
-                      <p className="text-xs text-[#777777] mb-3">
-                        These frames and captions already existed from ingest. They are the events the answer used.
-                      </p>
-                      <div className="space-y-3">
+                      <div className="space-y-2.5">
                         {turn.response.citations.map((citation) => (
                           <CitationCard key={citation.event_id} citation={citation} />
                         ))}
                       </div>
                     </div>
                   ) : (
-                    <p className="text-xs text-[#777777]">
-                      No event passed the retrieval floor, so there is no thumbnail to show — the system did not invent one.
+                    <p className="text-xs text-[#AAAAAA] italic">
+                      No events matched the search criteria with high confidence.
                     </p>
                   )}
                 </div>
               ) : turn.error ? (
-                <div className="ml-9">
+                <div className="ml-10">
                   <ErrorBanner message={turn.error} />
                 </div>
               ) : null}
 
               {/* Divider */}
-              <div className="border-b border-[#111111]" />
+              <div className="border-b border-[#181818]" />
             </article>
           ))
         )}
@@ -270,43 +266,46 @@ export function ConversationTab({
       </div>
 
       {/* Input area */}
-      <div className="border-t border-[#1a1a1a] bg-[#050505] px-8 py-5 shrink-0">
+      <div className="border-t border-[#1f1f1f] bg-[#050505] px-6 py-4 shrink-0 space-y-2.5">
         {submitError && turns.length === 0 ? (
-          <div className="mb-4 max-w-2xl">
+          <div className="mb-2 max-w-2xl">
             <ErrorBanner message={submitError} />
           </div>
         ) : null}
 
-        <form onSubmit={onSubmit} className="flex flex-col gap-3">
+        <form onSubmit={onSubmit} className="flex flex-col gap-2.5">
           <TextArea
             id="query-input"
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Ask about people, clothing, vehicles, or a time window in this clip…"
+            placeholder="Ask anything about the footage (e.g., 'Did anyone in a red jacket appear?'). Press Enter to submit."
             disabled={!isReady || submitting}
-            rows={3}
+            rows={2}
+            className="text-sm p-3 bg-[#0a0a0a] border-[#2b2b2b] rounded-lg text-[#EEEEEE] focus:border-[#CB2957]"
           />
-          <div className="flex items-center justify-between">
-            <div className="flex flex-wrap gap-2">
+          <div className="flex items-center justify-between flex-wrap gap-2.5">
+            <div className="flex flex-wrap gap-1.5">
+              <span className="text-xs text-[#AAAAAA] font-medium flex items-center">Suggested:</span>
               {SAMPLE_QUESTIONS.slice(0, 3).map((q) => (
                 <button
                   key={q}
                   type="button"
                   onClick={() => void submit(q)}
                   disabled={!isReady || submitting}
-                  className="font-mono text-[10px] uppercase tracking-wide text-[#888888] hover:text-[#CB2957] border border-[#1a1a1a] hover:border-[#CB2957]/40 px-2.5 py-1 rounded-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="text-xs font-medium text-[#DDDDDD] hover:text-[#CB2957] bg-[#111111] hover:bg-[#181818] border border-[#222222] hover:border-[#CB2957]/40 px-2.5 py-1 rounded transition-all disabled:opacity-40"
                 >
-                  {q.length > 36 ? q.slice(0, 36) + '…' : q}
+                  {q}
                 </button>
               ))}
             </div>
             <Button
               type="submit"
-              disabled={!isReady || submitting || question.trim().length < 3}
-              className="shrink-0"
+              disabled={!isReady || submitting || !question.trim()}
+              size="md"
+              className="px-5 font-semibold text-xs"
             >
-              {submitting ? 'Searching index…' : 'Search index'}
+              {submitting ? 'Querying Index…' : 'Search Footage'}
             </Button>
           </div>
         </form>

@@ -1,3 +1,4 @@
+import React from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
 
 import { ErrorBanner } from '../../components/ErrorBanner.tsx'
@@ -20,9 +21,9 @@ const NAV_ITEMS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     id: 'conversation',
     label: 'Intelligence Query',
     icon: (
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-        <path d="M2 2h10v8H8.5L7 12l-1.5-2H2V2z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round"/>
-        <path d="M4 5h6M4 7h4" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+        <path d="M3 4h14v10H9.5L6 17l-1.5-3H3V4z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+        <path d="M6 8h8M6 11h5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
       </svg>
     ),
   },
@@ -30,9 +31,9 @@ const NAV_ITEMS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     id: 'video',
     label: 'Ingest Footage',
     icon: (
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-        <rect x="0.75" y="3" width="8.5" height="8" rx="1" stroke="currentColor" strokeWidth="1.1"/>
-        <path d="M9.25 6l4-2v6l-4-2V6z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round"/>
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+        <rect x="2" y="4" width="11" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.5"/>
+        <path d="M13 8l5-3v10l-5-3V8z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
       </svg>
     ),
   },
@@ -40,9 +41,9 @@ const NAV_ITEMS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     id: 'events',
     label: 'Event Index',
     icon: (
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-        <rect x="1" y="1" width="12" height="12" rx="1" stroke="currentColor" strokeWidth="1.1"/>
-        <path d="M4 4h6M4 7h6M4 10h4" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+        <rect x="2" y="2" width="16" height="16" rx="1.5" stroke="currentColor" strokeWidth="1.5"/>
+        <path d="M6 6h8M6 10h8M6 14h6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
       </svg>
     ),
   },
@@ -57,13 +58,11 @@ function LiveClock() {
   }, [])
   const pad = (n: number) => String(n).padStart(2, '0')
   return (
-    <span className="font-mono text-[10px] text-[#888888] tabular-nums">
+    <span className="font-mono text-xs text-[#CCCCCC] tabular-nums font-medium">
       {pad(time.getHours())}:{pad(time.getMinutes())}:{pad(time.getSeconds())}
     </span>
   )
 }
-
-import React from 'react'
 
 export function WorkspacePage() {
   const { user, ready, logout } = useAuth()
@@ -82,41 +81,41 @@ export function WorkspacePage() {
   const isProcessing = currentStatus === 'processing' || currentStatus === 'uploaded'
 
   return (
-    <div className="flex h-screen bg-black text-[#EEEEEE] overflow-hidden">
+    <div className="flex h-screen bg-black text-[#EEEEEE] overflow-hidden font-sans">
 
       {/* ── SIDEBAR ─────────────────────────────────────────── */}
-      <aside className="flex w-64 shrink-0 flex-col border-r border-[#1a1a1a] bg-[#050505]">
+      <aside className="flex w-64 shrink-0 flex-col border-r border-[#1f1f1f] bg-[#050505]">
 
         {/* Logo */}
-        <div className="flex items-center gap-3 border-b border-[#1a1a1a] px-5 py-4">
-          <div className="flex h-7 w-7 items-center justify-center rounded-sm bg-[#CB2957]">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <div className="flex items-center gap-2.5 border-b border-[#1f1f1f] px-5 py-4">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[#CB2957] shadow-[0_0_12px_rgba(203,41,87,0.4)]">
+            <svg width="15" height="15" viewBox="0 0 14 14" fill="none">
               <rect x="0" y="3" width="9" height="8" rx="1.2" fill="white"/>
               <path d="M9 5.5l4.5-2.5v8l-4.5-2.5V5.5z" fill="white"/>
             </svg>
           </div>
           <div>
-            <div className="font-mono text-sm font-semibold tracking-tight leading-none">SENTINEL<span className="text-[#CB2957]">RAG</span></div>
-            <div className="font-mono text-[9px] text-[#888888] uppercase tracking-widest mt-0.5">Operator Console</div>
+            <div className="text-sm font-bold tracking-tight leading-none text-white">SENTINEL<span className="text-[#CB2957]">RAG</span></div>
+            <div className="text-[10px] text-[#AAAAAA] font-medium tracking-wider uppercase mt-1">Operator Console</div>
           </div>
         </div>
 
         {/* System Status */}
-        <div className="border-b border-[#111111] px-5 py-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="font-mono text-[9px] uppercase tracking-widest text-[#777777]">System Status</span>
+        <div className="border-b border-[#181818] px-5 py-3 bg-[#080808]">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-[#999999]">System Status</span>
             <LiveClock />
           </div>
           <div className="flex items-center gap-2">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#22c55e] pulse-dot" />
-            <span className="font-mono text-[10px] text-[#22c55e] uppercase tracking-wide">Online</span>
+            <span className="h-1.5 w-1.5 rounded-full bg-[#22c55e] animate-pulse" />
+            <span className="text-[11px] font-semibold text-[#22c55e] uppercase tracking-wider">Online & Active</span>
           </div>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 py-3">
-          <div className="px-5 py-2">
-            <span className="font-mono text-[9px] uppercase tracking-widest text-[#777777]">Navigation</span>
+        <nav className="flex-1 py-3 space-y-1">
+          <div className="px-5 py-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#888888]">Navigation</span>
           </div>
           {NAV_ITEMS.map(({ id, label, icon }) => {
             const active = tab === id
@@ -127,18 +126,18 @@ export function WorkspacePage() {
                 type="button"
                 onClick={() => go(id)}
                 className={[
-                  'group flex w-full items-center gap-3 px-5 py-2.5 text-left transition-all duration-150',
+                  'group flex w-full items-center gap-3 px-5 py-2.5 text-left transition-all duration-150 text-xs font-semibold',
                   active
-                    ? 'border-r-2 border-[#CB2957] bg-[#CB2957]/8 text-[#EEEEEE]'
-                    : 'border-r-2 border-transparent text-[#999999] hover:text-[#DDDDDD] hover:bg-[#0a0a0a]',
+                    ? 'border-r-4 border-[#CB2957] bg-[#CB2957]/10 text-white'
+                    : 'border-r-4 border-transparent text-[#AAAAAA] hover:text-white hover:bg-[#111111]',
                 ].join(' ')}
               >
-                <span className={active ? 'text-[#CB2957]' : 'text-[#888888] group-hover:text-[#888888]'}>
+                <span className={active ? 'text-[#CB2957]' : 'text-[#888888] group-hover:text-[#CCCCCC]'}>
                   {icon}
                 </span>
-                <span className="text-xs font-medium">{label}</span>
+                <span>{label}</span>
                 {eventCount !== null && (
-                  <span className="ml-auto font-mono text-[9px] rounded-sm bg-[#CB2957]/15 text-[#CB2957] border border-[#CB2957]/20 px-1.5 py-0.5">
+                  <span className="ml-auto font-mono text-[10px] rounded-full bg-[#CB2957]/20 text-[#CB2957] border border-[#CB2957]/30 px-1.5 py-0.5 font-bold">
                     {eventCount}
                   </span>
                 )}
@@ -149,29 +148,29 @@ export function WorkspacePage() {
 
         {/* Active Video Info */}
         {video && (
-          <div className="border-t border-[#111111] px-5 py-4 space-y-2">
-            <div className="font-mono text-[9px] uppercase tracking-widest text-[#777777]">Active Feed</div>
+          <div className="border-t border-[#1f1f1f] px-5 py-3 space-y-1.5 bg-[#080808]">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-[#888888]">Active Feed Stream</div>
             <div className="flex items-start gap-2">
               <StatusDot tone={statusTone} label={currentStatus ?? 'unknown'} pulse={isProcessing} />
             </div>
-            <div className="font-mono text-[10px] text-[#888888] leading-relaxed break-all">
-              <div className="text-[#999999]">{video.camera_id}</div>
-              <div>{video.video_id}</div>
+            <div className="text-xs text-[#AAAAAA] leading-relaxed break-all font-mono pt-0.5">
+              <div className="text-white font-semibold font-sans">{video.camera_id}</div>
+              <div className="text-[10px] text-[#888888]">{video.video_id}</div>
             </div>
           </div>
         )}
 
         {/* User / Logout */}
-        <div className="border-t border-[#111111] px-5 py-4">
+        <div className="border-t border-[#1f1f1f] px-5 py-3 bg-[#050505]">
           <div className="flex items-center justify-between">
             <div>
-              <div className="font-mono text-[9px] uppercase tracking-widest text-[#777777] mb-1">Operator</div>
-              <div className="text-xs text-[#999999] truncate max-w-[140px]">{user?.email}</div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-[#888888]">Operator</div>
+              <div className="text-xs font-medium text-[#EEEEEE] truncate max-w-[130px]">{user?.email}</div>
             </div>
             <button
               type="button"
               onClick={() => void logout()}
-              className="font-mono text-[10px] uppercase tracking-widest text-[#888888] hover:text-[#CB2957] transition-colors"
+              className="text-[11px] font-semibold uppercase tracking-wider text-[#CCCCCC] hover:text-[#CB2957] bg-[#141414] border border-[#262626] px-2.5 py-1 rounded transition-colors"
             >
               Exit
             </button>
@@ -182,22 +181,22 @@ export function WorkspacePage() {
       {/* ── MAIN CONTENT ─────────────────────────────────────── */}
       <main className="flex flex-1 flex-col min-w-0 overflow-hidden">
         {/* Top bar */}
-        <div className="flex items-center justify-between border-b border-[#1a1a1a] bg-[#050505] px-8 py-3 shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#CB2957] pulse-dot" />
-            <span className="font-mono text-[10px] uppercase tracking-widest text-[#888888]">
-              {tab === 'conversation' ? 'Intelligence Query Interface'
-               : tab === 'video' ? 'Footage Ingestion'
-               : 'Event Index Browser'}
-            </span>
+        <div className="flex items-center justify-between border-b border-[#1f1f1f] bg-[#050505] px-6 py-3 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <span className="h-2 w-2 rounded-full bg-[#CB2957] animate-pulse" />
+            <h2 className="text-sm font-semibold text-[#EEEEEE]">
+              {tab === 'conversation' ? 'Intelligence Query Console'
+               : tab === 'video' ? 'CCTV Footage Ingestion & Pipeline'
+               : 'Event Index Catalog'}
+            </h2>
           </div>
           {video && (
-            <div className="flex items-center gap-4">
-              <span className="font-mono text-[10px] text-[#777777] uppercase tracking-wide">
-                {video.camera_id} · {video.original_filename}
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-[#CCCCCC] font-medium bg-[#111111] px-2.5 py-1 rounded border border-[#222222]">
+                📹 {video.camera_id} · <span className="text-white">{video.original_filename}</span>
               </span>
               {status && (
-                <StatusDot tone={statusTone} label={`${status.progress.toFixed(0)}%`} pulse={isProcessing} />
+                <StatusDot tone={statusTone} label={`${status.progress.toFixed(0)}% Complete`} pulse={isProcessing} />
               )}
             </div>
           )}
@@ -206,18 +205,18 @@ export function WorkspacePage() {
         {/* Content area */}
         <div className="flex-1 overflow-y-auto">
           {error ? (
-            <div className="m-8 max-w-2xl">
+            <div className="m-6 max-w-2xl">
               <ErrorBanner message={error} />
             </div>
           ) : null}
 
           {loading ? (
             <div className="flex h-full items-center justify-center">
-              <div className="text-center">
-                <div className="mx-auto mb-4 h-8 w-8 rounded-sm border border-[#CB2957]/20 bg-[#CB2957]/5 flex items-center justify-center">
-                  <span className="h-2 w-2 rounded-full bg-[#CB2957] pulse-dot" />
+              <div className="text-center space-y-2.5">
+                <div className="mx-auto h-8 w-8 rounded-full border border-[#CB2957]/30 bg-[#CB2957]/10 flex items-center justify-center">
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#CB2957] animate-ping" />
                 </div>
-                <span className="font-mono text-xs text-[#888888] uppercase tracking-widest">Loading workspace…</span>
+                <span className="text-xs font-semibold text-[#DDDDDD] uppercase tracking-wider block">Loading workspace session…</span>
               </div>
             </div>
           ) : null}

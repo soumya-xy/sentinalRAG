@@ -30,8 +30,15 @@ function readDetail(payload: unknown): string {
 
 export function resolveMediaUrl(path?: string | null): string {
   if (!path) return ''
-  if (path.startsWith('http://') || path.startsWith('https://')) return path
-  return `${API_BASE}${path.startsWith('/') ? path : `/${path}`}`
+  if (path.startsWith('data:')) return path
+  let fullUrl = path.startsWith('http://') || path.startsWith('https://')
+    ? path
+    : `${API_BASE}${path.startsWith('/') ? path : `/${path}`}`
+  const token = getToken()
+  if (token && !fullUrl.includes('token=')) {
+    fullUrl += `${fullUrl.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}`
+  }
+  return fullUrl
 }
 
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {

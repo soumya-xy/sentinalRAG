@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user_from_header_or_query
 from app.core.config import get_settings
 from app.models.auth import UserPublic
 from app.services.object_storage import download_thumbnail, thumbnail_object_key
@@ -14,7 +14,8 @@ router = APIRouter(prefix="/api/media", tags=["media"])
 def get_thumbnail(
     video_id: str,
     filename: str,
-    user: UserPublic = Depends(get_current_user),
+    token: str | None = Query(default=None),
+    user: UserPublic = Depends(get_current_user_from_header_or_query),
 ) -> Response:
     if "/" in filename or "\\" in filename or ".." in filename or ".." in video_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid path")
