@@ -6,13 +6,15 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import auth, events, health, media, query, videos
 from app.core.config import get_settings
+from app.core.logging import configure_logging
+from app.middleware.request_context import RequestContextMiddleware
 from app.services.store import configure_store
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     settings = get_settings()
-    logging.basicConfig(level=getattr(logging, settings.log_level.upper(), logging.INFO))
+    configure_logging()
     configure_store()
     if settings.supabase_enabled:
         logging.getLogger("sentinelrag").info("Catalog backend: Supabase + pgvector")
@@ -31,12 +33,14 @@ def create_app() -> FastAPI:
         version="0.1.0",
         lifespan=lifespan,
     )
+    application.add_middleware(RequestContextMiddleware)
     application.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["X-Request-ID", "X-Query-ID"],
     )
     application.include_router(health.router)
     application.include_router(auth.router)

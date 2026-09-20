@@ -6,13 +6,16 @@ import base64
 import logging
 from pathlib import Path
 from typing import Any, TypedDict
+from uuid import uuid4
 
 from langchain_core.messages import HumanMessage
 from langgraph.graph import END, START, StateGraph
 
 from app.core.config import get_settings
+from app.core.context import bind_log_context, get_query_id, get_request_id, set_query_id, set_video_id
 from app.models.event import EventRecord
 from app.models.query import Citation, QueryResponse
+from app.services.gemini_retry import call_with_backoff
 from app.services.llm import get_chat_model, message_text
 from app.services.retrieval import retrieve_events
 
@@ -20,6 +23,15 @@ logger = logging.getLogger("sentinelrag.query")
 
 
 def _get_event_image_b64(event: EventRecord) -> str | None:
+    from app.services.object_storage import decode_inline_image, looks_like_inline_image
+
+    for value in (event.thumbnail_path, event.thumbnail_url or ""):
+        if looks_like_inline_image(value):
+            try:
+                raw, _, _ = decode_inline_image(value)
+                return base64.b64encode(raw).decode("ascii")
+            except Exception as exc:
+                logger.debug("Could not decode leftover inline thumbnail for %s: %s", event.event_id, exc)
     if not event.thumbnail_path:
         return None
     try:
@@ -43,9 +55,11 @@ class QueryState(TypedDict, total=False):
     camera_id: str
     user_id: str
     events: list[EventRecord]
+    query_id: str
     retrieved: list[EventRecord]
     answer: str
     answer_source: str
+    visual_reinspection_skipped: bool
     citations: list[Citation]
 
 
@@ -76,14 +90,20 @@ def _retrieve(state: QueryState) -> dict[str, list[EventRecord]]:
     return {"retrieved": retrieved}
 
 
-def _compose(state: QueryState) -> dict[str, str]:
+def _compose(state: QueryState) -> dict[str, Any]:
     retrieved = state.get("retrieved") or []
     camera_id = state["camera_id"]
     question = state["question"]
+    video_id = state["video_id"]
+    query_id = state.get("query_id") or get_query_id() or ""
+    set_video_id(video_id)
+    if query_id:
+        set_query_id(query_id)
     if not retrieved:
         return {
             "answer": _fallback_answer(question, retrieved, camera_id),
             "answer_source": "none",
+            "visual_reinspection_skipped": False,
         }
 
     llm = get_chat_model()
@@ -91,6 +111,7 @@ def _compose(state: QueryState) -> dict[str, str]:
         return {
             "answer": _fallback_answer(question, retrieved, camera_id),
             "answer_source": "extractive",
+            "visual_reinspection_skipped": False,
         }
 
     context = "\n".join(
@@ -110,7 +131,29 @@ def _compose(state: QueryState) -> dict[str, str]:
         f"Events:\n{context}\n\nQuestion: {question}"
     )
 
-    # Build multimodal content for Visual Re-Inspection
+    try:
+        pass1 = call_with_backoff(
+            lambda: llm.invoke(prompt),
+            stage="compose_text",
+            video_id=video_id,
+            query_id=query_id,
+        )
+        pass1_text = message_text(pass1.content).strip()
+        if not pass1_text:
+            raise ValueError("empty model answer")
+    except Exception as exc:
+        logger.warning(
+            "Pass-1 text compose failed; using extractive fallback. video_id=%s query_id=%s err=%s",
+            video_id,
+            query_id,
+            exc,
+        )
+        return {
+            "answer": _fallback_answer(question, retrieved, camera_id),
+            "answer_source": "extractive",
+            "visual_reinspection_skipped": False,
+        }
+
     content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
     for event in retrieved:
         img_b64 = _get_event_image_b64(event)
@@ -122,29 +165,47 @@ def _compose(state: QueryState) -> dict[str, str]:
                 }
             )
 
-    try:
-        if len(content) > 1:
-            try:
-                result = llm.invoke([HumanMessage(content=content)])
-            except Exception as mm_exc:
-                logger.info("Multimodal prompt failed, falling back to text-only prompt: %s", mm_exc)
-                result = llm.invoke(prompt)
-        else:
-            result = llm.invoke(prompt)
+    if len(content) <= 1:
+        return {
+            "answer": pass1_text,
+            "answer_source": "llm",
+            "visual_reinspection_skipped": False,
+        }
 
-        text = message_text(result.content).strip()
+    try:
+        pass2 = call_with_backoff(
+            lambda: llm.invoke([HumanMessage(content=content)]),
+            stage="visual_reinspection",
+            video_id=video_id,
+            query_id=query_id,
+        )
+        text = message_text(pass2.content).strip()
         if not text:
             raise ValueError("empty model answer")
-        return {"answer": text, "answer_source": "llm"}
-    except Exception as exc:
-        logger.warning("LLM compose failed, using extractive fallback: %s", exc)
         return {
-            "answer": _fallback_answer(question, retrieved, camera_id),
-            "answer_source": "extractive",
+            "answer": text,
+            "answer_source": "llm",
+            "visual_reinspection_skipped": False,
+        }
+    except Exception as exc:
+        logger.warning(
+            "Visual re-inspection skipped after retries; returning Pass-1 text answer. "
+            "video_id=%s query_id=%s err=%s",
+            video_id,
+            query_id,
+            exc,
+        )
+        return {
+            "answer": pass1_text,
+            "answer_source": "llm",
+            "visual_reinspection_skipped": True,
         }
 
 
 def _cite(state: QueryState) -> dict[str, list[Citation]]:
+    from app.services.object_storage import attach_signed_thumbnail_urls
+
+    retrieved = attach_signed_thumbnail_urls(list(state.get("retrieved") or []))
     citations = [
         Citation(
             event_id=event.event_id,
@@ -158,7 +219,7 @@ def _cite(state: QueryState) -> dict[str, list[Citation]]:
             caption=event.caption,
             caption_source=event.caption_source,
         )
-        for event in (state.get("retrieved") or [])
+        for event in retrieved
     ]
     return {"citations": citations}
 
@@ -193,29 +254,41 @@ def invoke_query_graph(
     events: list[EventRecord],
     user_id: str | None = None,
 ) -> QueryResponse:
-    result = _graph().invoke(
-        {
-            "question": question,
-            "video_id": video_id,
-            "camera_id": camera_id,
-            "user_id": user_id or "",
-            "events": events,
-        }
-    )
+    query_id = get_query_id() or get_request_id() or f"qry_{uuid4().hex[:10]}"
+    set_query_id(query_id)
+    set_video_id(video_id)
+    with bind_log_context(video_id=video_id, query_id=query_id):
+        result = _graph().invoke(
+            {
+                "question": question,
+                "video_id": video_id,
+                "camera_id": camera_id,
+                "user_id": user_id or "",
+                "query_id": query_id,
+                "events": events,
+            }
+        )
     retrieved = result.get("retrieved") or []
     answer_source = result.get("answer_source") or ("none" if not retrieved else "extractive")
+    skipped = bool(result.get("visual_reinspection_skipped"))
     return QueryResponse(
         answer=result.get("answer") or _fallback_answer(question, retrieved, camera_id),
         citations=result.get("citations") or [],
         retrieved_event_ids=[event.event_id for event in retrieved],
         video_id=video_id,
         camera_id=camera_id,
-        provenance=_provenance(retrieved, answer_source),
+        provenance=_provenance(retrieved, answer_source, skipped),
         answer_source=answer_source,
+        visual_reinspection_skipped=skipped,
+        query_id=query_id,
     )
 
 
-def _provenance(retrieved: list[EventRecord], answer_source: str) -> str:
+def _provenance(
+    retrieved: list[EventRecord],
+    answer_source: str,
+    visual_reinspection_skipped: bool = False,
+) -> str:
     if not retrieved:
         return (
             "Nothing in this video's event index was similar enough. "
@@ -224,6 +297,12 @@ def _provenance(retrieved: list[EventRecord], answer_source: str) -> str:
     windows = ", ".join(
         f"{event.start_timestamp}–{event.end_timestamp}" for event in retrieved[:3]
     )
+    if answer_source == "llm" and visual_reinspection_skipped:
+        return (
+            f"Searched this video's index and retrieved {len(retrieved)} event(s) "
+            f"({windows}). Gemini wrote a text-only answer from those captions. "
+            "Visual re-inspection of cited frames was skipped after Gemini retries."
+        )
     if answer_source == "llm":
         return (
             f"Searched this video's index and retrieved {len(retrieved)} event(s) "

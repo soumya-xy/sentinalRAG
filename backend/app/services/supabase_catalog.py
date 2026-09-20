@@ -8,6 +8,7 @@ from app.models.event import EventRecord
 from app.models.video import VideoStatus
 from app.services.catalog_types import STAGE_KEYS, VideoInternal
 from app.services.embedding_meta import current_embedding_model, current_embedding_model_version
+from app.services.object_storage import attach_signed_thumbnail_urls
 from app.services.supabase_client import get_admin_client
 
 
@@ -32,6 +33,7 @@ def _video_from_row(row: dict) -> VideoInternal:
         status=row["status"],
         created_at=_parse_dt(row["created_at"]),
         size_bytes=int(row.get("size_bytes") or 0),
+        content_hash=row.get("content_hash"),
         duration_seconds=row.get("duration_seconds"),
         error=row.get("error"),
         events_materialized=bool(row.get("events_materialized")),
@@ -55,7 +57,7 @@ def _event_from_row(row: dict) -> EventRecord:
             "bounding_boxes": row.get("bounding_boxes") or [],
             "thumbnail_path": row["thumbnail_path"],
             "confidence_score": row["confidence_score"],
-            "thumbnail_url": row.get("thumbnail_url"),
+            "thumbnail_url": None,
             "caption_source": row.get("caption_source"),
             "object_count": row.get("object_count") or 1,
             "embedding_model": row.get("embedding_model"),
@@ -98,6 +100,7 @@ class SupabaseCatalog:
             "status": video.status,
             "duration_seconds": video.duration_seconds,
             "size_bytes": video.size_bytes,
+            "content_hash": video.content_hash,
             "error": video.error,
             "events_materialized": video.events_materialized,
             "current_stage": video.current_stage,
@@ -106,8 +109,29 @@ class SupabaseCatalog:
             "stage_progress": video.stage_progress,
             "created_at": video.created_at.isoformat(),
         }
-        client.table("videos").upsert(payload).execute()
+        try:
+            client.table("videos").upsert(payload).execute()
+        except Exception:
+            payload.pop("content_hash", None)
+            client.table("videos").upsert(payload).execute()
         return video
+
+    def find_videos_by_content_hash(self, user_id: str, content_hash: str) -> list[VideoInternal]:
+        if not content_hash:
+            return []
+        try:
+            result = (
+                get_admin_client()
+                .table("videos")
+                .select("*")
+                .eq("user_id", user_id)
+                .eq("content_hash", content_hash)
+                .order("created_at", desc=True)
+                .execute()
+            )
+        except Exception:
+            return []
+        return [_video_from_row(row) for row in (result.data or [])]
 
     def get_video(self, video_id: str) -> VideoInternal | None:
         client = get_admin_client()
@@ -225,7 +249,7 @@ class SupabaseCatalog:
                 "detected_classes": event.detected_classes,
                 "bounding_boxes": [box.model_dump() for box in event.bounding_boxes],
                 "thumbnail_path": event.thumbnail_path,
-                "thumbnail_url": event.thumbnail_url,
+                "thumbnail_url": None,
                 "confidence_score": event.confidence_score,
                 "caption_source": event.caption_source,
                 "object_count": event.object_count,
@@ -276,7 +300,9 @@ class SupabaseCatalog:
                 .order("start_timestamp")
                 .execute()
             )
-        return [_event_from_row(row) for row in (result.data or [])]
+        return attach_signed_thumbnail_urls(
+            [_event_from_row(row) for row in (result.data or [])]
+        )
 
     def match_events(
         self,

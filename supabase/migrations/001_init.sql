@@ -13,6 +13,7 @@ create table if not exists public.videos (
   status text not null,
   duration_seconds double precision,
   size_bytes bigint not null default 0,
+  content_hash text,
   error text,
   events_materialized boolean not null default false,
   current_stage text,
@@ -24,6 +25,7 @@ create table if not exists public.videos (
 
 create index if not exists videos_user_id_idx on public.videos (user_id);
 create index if not exists videos_created_at_idx on public.videos (created_at desc);
+create index if not exists videos_user_content_hash_idx on public.videos (user_id, content_hash);
 
 create table if not exists public.events (
   event_id text primary key,

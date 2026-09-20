@@ -36,11 +36,13 @@ export function VideoTab({
   const [uploading, setUploading] = useState(false)
   const [retrying, setRetrying] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [duplicateNotice, setDuplicateNotice] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
 
   function takeFile(next: File | null) {
     setFile(next)
     setError(null)
+    setDuplicateNotice(null)
   }
 
   function onFile(e: ChangeEvent<HTMLInputElement>) {
@@ -58,9 +60,15 @@ export function VideoTab({
     if (!file) { setError('Select a recorded video file first.'); return }
     setUploading(true)
     setError(null)
+    setDuplicateNotice(null)
     try {
       const record = await api.uploadVideo(file, cameraId.trim() || 'cam-01')
       setFile(null)
+      if (record.duplicate) {
+        setDuplicateNotice(
+          `This file was already processed. Reusing ${record.video_id} — pipeline was not run again.`,
+        )
+      }
       await onUploaded(record)
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : 'Upload failed')
@@ -103,6 +111,12 @@ export function VideoTab({
       {/* Upload form */}
       <form onSubmit={onSubmit} className="space-y-4">
         {error ? <ErrorBanner message={error} /> : null}
+        {duplicateNotice ? (
+          <div className="rounded-md border border-[#22c55e]/30 bg-[#22c55e]/10 px-3.5 py-2.5 text-xs text-[#DDDDDD] leading-relaxed">
+            <span className="font-semibold text-[#22c55e] uppercase tracking-wider">Duplicate </span>
+            {duplicateNotice}
+          </div>
+        ) : null}
 
         {/* Drop zone */}
         <label
@@ -197,6 +211,12 @@ export function VideoTab({
               <span>{video.video_id}</span>
               <span>·</span>
               <span>{video.camera_id}</span>
+              {video.content_hash ? (
+                <>
+                  <span>·</span>
+                  <span title={video.content_hash}>sha256 {video.content_hash.slice(0, 12)}</span>
+                </>
+              ) : null}
             </div>
 
             {/* Error */}

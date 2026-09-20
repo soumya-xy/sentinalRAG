@@ -17,5 +17,5 @@ class EventIndexer:
         if events:
             embeddings = embed_texts([event.caption for event in events])
         store.set_events(video_id, events, embeddings=embeddings)
-        logger.info("Indexed %s events for %s", len(events), video_id)
+        logger.info("Indexed event_count=%s", len(events))
         return len(events)

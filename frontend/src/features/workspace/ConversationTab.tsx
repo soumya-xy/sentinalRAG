@@ -218,6 +218,12 @@ export function ConversationTab({
                     {turn.response.provenance
                       ?? 'Retrieved matching event captions, inspected image frames, and composed grounded answer.'}
                   </ProvenanceNote>
+                  {turn.response.visual_reinspection_skipped ? (
+                    <p className="text-xs text-[#888888]">
+                      Visual re-inspection of cited frames was skipped after Gemini retries.
+                      This answer is the text-only Pass-1 result.
+                    </p>
+                  ) : null}
                   <div className="bg-[#080808] p-4 rounded-lg border border-[#222222] space-y-2">
                     <div className="flex items-center justify-between border-b border-[#1a1a1a] pb-1.5">
                       <div className="text-xs font-bold uppercase tracking-wider text-[#CB2957] flex items-center gap-1.5">

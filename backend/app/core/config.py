@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     app_host: str = "0.0.0.0"
     app_port: int = 8000
     log_level: str = "info"
+    log_format: str = "json"
 
     supabase_url: str = ""
     supabase_anon_key: str = ""
@@ -28,6 +29,7 @@ class Settings(BaseSettings):
     supabase_jwt_secret: str = ""
     supabase_videos_bucket: str = "videos"
     supabase_thumbnails_bucket: str = "thumbnails"
+    thumbnail_signed_url_ttl_seconds: int = 3600
 
     frame_sample_interval_seconds: float = 0.8
     use_scene_change_detection: bool = False
@@ -70,6 +72,8 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o"
     google_api_key: str = ""
     google_model: str = "gemini-2.5-flash"
+    gemini_retry_attempts: int = 3
+    gemini_retry_base_delay_seconds: float = 1.0
     local_llm_endpoint: str = ""
     local_llm_model_name: str = ""
 

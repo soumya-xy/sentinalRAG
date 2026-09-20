@@ -22,7 +22,7 @@ You do **not** need a separate database URL. The service role key can read/write
 ## One-time Supabase setup
 
 1. Auth → Providers → Email: turn **Confirm email** **off** while you develop (otherwise register returns no session).
-2. SQL Editor: run [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql). If that file was already applied earlier, also run [`supabase/migrations/002_retrieval_and_event_quality.sql`](supabase/migrations/002_retrieval_and_event_quality.sql), [`supabase/migrations/003_add_hnsw_index.sql`](supabase/migrations/003_add_hnsw_index.sql), and [`supabase/migrations/004_embedding_model.sql`](supabase/migrations/004_embedding_model.sql). That creates:
+2. SQL Editor: run [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql). If that file was already applied earlier, also run [`supabase/migrations/002_retrieval_and_event_quality.sql`](supabase/migrations/002_retrieval_and_event_quality.sql), [`supabase/migrations/003_add_hnsw_index.sql`](supabase/migrations/003_add_hnsw_index.sql), [`supabase/migrations/004_embedding_model.sql`](supabase/migrations/004_embedding_model.sql), [`supabase/migrations/005_thumbnail_storage_stats.sql`](supabase/migrations/005_thumbnail_storage_stats.sql), and [`supabase/migrations/006_video_content_hash.sql`](supabase/migrations/006_video_content_hash.sql). That creates:
    - `vector` extension
    - `videos` and `events` tables (`events.embedding vector(768)`)
    - HNSW index on `events.embedding` (`vector_cosine_ops`)
@@ -30,6 +30,7 @@ You do **not** need a separate database URL. The service role key can read/write
    - private buckets `videos` and `thumbnails`
    - RLS so each `auth.uid()` only sees its own rows/objects
 3. Confirm Storage shows buckets `videos` and `thumbnails`.
+4. If older event rows still store `data:image/...;base64,...` in `thumbnail_path` / `thumbnail_url`, run `python scripts/migrate_inline_thumbnails.py` from the repo root (prints `pg_total_relation_size` before/after).
 
 The backend uses the **service role**, which bypasses RLS. Policies are there so a leaked anon key cannot read another user's files.
 
@@ -65,8 +66,8 @@ Tests force an empty Supabase config and use an in-memory catalog. They never wr
 |---|---|
 | Users / passwords / sessions | Supabase Auth |
 | Uploaded videos | Supabase Storage `videos/{user_id}/{video_id}.mp4` |
-| Event thumbnails | Supabase Storage `thumbnails/{user_id}/{video_id}/{event_id}.jpg` |
-| Video status + event captions | Supabase table `videos` / `events` |
+| Event thumbnails | Supabase Storage `thumbnails/{user_id}/{video_id}/{event_id}.jpg` (row stores the key only; API mints a 1-hour signed URL) |
+| Video status + event captions | Supabase table `videos` / `events` (`videos.content_hash` is SHA-256 of the uploaded bytes) |
 | Caption vectors | `events.embedding` (pgvector, 768-d Gemini embeddings) plus `embedding_model` |
 | YOLO weights | Local `yolo11n.pt` only (model file, not user data) |
 | Sampled frames | OS temp dir, deleted when ingest finishes |

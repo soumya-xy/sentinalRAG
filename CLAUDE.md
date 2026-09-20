@@ -107,7 +107,7 @@ Every indexed "event" record must include, at minimum:
 - `caption` — natural language description (VLM-generated or rule-based)
 - `detected_classes` — list of object classes involved (e.g., ["person", "car"])
 - `bounding_boxes` — coordinates per relevant frame or a representative frame
-- `thumbnail_path` — path to a representative frame image for UI display
+- `thumbnail_path` — Supabase Storage object key for a representative frame (never image bytes / base64). A 1-hour signed URL is minted at query/list time and is not stored on the row.
 - `confidence_score` — detection/caption confidence, used for retrieval ranking and XAI-style transparency
 
 Do not build the schema without `video_id`/`camera_id` even if only one video exists — retrofitting this later causes avoidable rework.

@@ -17,7 +17,7 @@ This document records the *why* behind every major technical and visual decision
 | Answer-generation LLM | **Gemini** via LangGraph | Anthropic, OpenAI, local vLLM | The author has a Gemini API key and no local LLM endpoint. Provider stays configurable. |
 | Embeddings | Gemini `text-embedding-004` (768-d) by default; BGE-M3 when `EMBEDDING_PROVIDER=local` | BGE-M3 only | Vectors are written into Supabase pgvector. The API embedder avoids a multi-GB CPU download. |
 | Vector database | **Supabase pgvector** | ChromaDB, Pinecone, Weaviate | Explicitly adopted so auth, files, rows, and vectors live in one hosted project. ChromaDB is removed. |
-| Object storage | **Supabase Storage** | Local `data/` folders | Videos and thumbnails are per-user objects. The laptop only keeps OS temp files during YOLO, then deletes them. |
+| Object storage | **Supabase Storage** | Local `data/` folders | Videos and thumbnails are per-user objects. Event rows store a Storage key only — never image bytes. Query/list responses mint a 1-hour signed URL. The laptop only keeps OS temp files during YOLO, then deletes them. |
 | Auth | **Supabase Auth** | In-memory JWT demo users | Real accounts; each user_id only reads its own videos/events. |
 | Orchestration | **LangGraph** | Raw prompt chaining, LlamaIndex | Consistent with existing framework experience; demonstrates depth in one tool rather than fragmenting effort across frameworks with overlapping purposes. |
 | Backend framework | **FastAPI** | Flask, Node/Express | Async-friendly, lightweight, and consistent with prior project stack. |

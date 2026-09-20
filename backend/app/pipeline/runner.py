@@ -118,7 +118,11 @@ def run_ingest_pipeline(
                     bounding_boxes=draft.bounding_boxes,
                     thumbnail_path=thumb_path,
                     confidence_score=draft.confidence_score,
-                    thumbnail_url=thumbnail_url(video.video_id, draft.event_id, suffix),
+                    thumbnail_url=(
+                        None
+                        if settings.supabase_enabled
+                        else thumbnail_url(video.video_id, draft.event_id, suffix)
+                    ),
                     caption_source=draft.caption_source,
                     object_count=draft.object_count,
                 )
@@ -126,5 +130,5 @@ def run_ingest_pipeline(
 
         indexer.upsert(records, video_id=video.video_id)
         mark("index", 100, "complete")
-        logger.info("Ingest finished for %s with %s events", video.video_id, len(records))
+        logger.info("Ingest finished event_count=%s", len(records))
         return records

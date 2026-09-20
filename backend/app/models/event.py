@@ -25,9 +25,14 @@ class EventRecord(BaseModel):
     caption: str
     detected_classes: list[str]
     bounding_boxes: list[BoundingBox]
-    thumbnail_path: str
+    thumbnail_path: str = Field(
+        description="Supabase Storage object key (or memory path in tests). Never image bytes."
+    )
     confidence_score: float = Field(ge=0.0, le=1.0)
-    thumbnail_url: str | None = None
+    thumbnail_url: str | None = Field(
+        default=None,
+        description="Ephemeral signed URL for API responses. Not persisted on the row.",
+    )
     caption_source: str | None = Field(
         default=None,
         description="vlm | rule_based — which captioner produced the text",

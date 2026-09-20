@@ -16,6 +16,24 @@ export function AuthenticatedImage({
   const [error, setError] = useState(false)
 
   useEffect(() => {
+    if (!path) {
+      setSrc('')
+      setLoading(false)
+      setError(true)
+      return
+    }
+
+    if (
+      path.startsWith('data:') ||
+      path.startsWith('http://') ||
+      path.startsWith('https://')
+    ) {
+      setSrc(path)
+      setError(false)
+      setLoading(false)
+      return
+    }
+
     const url = resolveMediaUrl(path)
     if (!url) {
       setSrc('')

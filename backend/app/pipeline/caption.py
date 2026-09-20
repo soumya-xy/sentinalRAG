@@ -144,14 +144,25 @@ class EventCaptioner:
         prompt = f"{_CAPTION_PROMPT}\n{_detector_constraints(draft)}"
         try:
             payload = base64.b64encode(payload_bytes).decode("ascii")
-            response = invoke_gemini_vision(prompt, payload)
+            response = invoke_gemini_vision(
+                prompt,
+                payload,
+                video_id=draft.video_id,
+                event_id=draft.event_id,
+            )
             text = clip_caption(message_text(response).strip())
             if not text:
                 raise ValueError("empty caption")
             draft.caption = text
             draft.caption_source = "vlm"
         except Exception as exc:
-            logger.warning("Gemini caption failed for %s: %s", draft.event_id, exc)
+            logger.warning(
+                "Caption fallback to rule-based after Gemini failure. "
+                "video_id=%s event_id=%s err=%s",
+                draft.video_id,
+                draft.event_id,
+                exc,
+            )
             self._apply_rule(draft)
 
     def _rule_based(self, drafts: list[EventDraft]) -> list[EventDraft]:

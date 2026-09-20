@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.core.config import get_settings
+from app.services.gemini_retry import call_with_backoff
 
 
 def message_text(content: Any) -> str:
@@ -49,7 +50,13 @@ def get_chat_model():
     return None
 
 
-def invoke_gemini_vision(prompt: str, jpeg_base64: str) -> str:
+def invoke_gemini_vision(
+    prompt: str,
+    jpeg_base64: str,
+    *,
+    video_id: str | None = None,
+    event_id: str | None = None,
+) -> str:
     settings = get_settings()
     if not settings.google_api_key:
         raise RuntimeError("GOOGLE_API_KEY is required for Gemini vision captions")
@@ -70,5 +77,14 @@ def invoke_gemini_vision(prompt: str, jpeg_base64: str) -> str:
             },
         ]
     )
-    result = model.invoke([message])
-    return message_text(result.content)
+
+    def _invoke() -> str:
+        result = model.invoke([message])
+        return message_text(result.content)
+
+    return call_with_backoff(
+        _invoke,
+        stage="caption_vision",
+        video_id=video_id,
+        event_id=event_id,
+    )

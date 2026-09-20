@@ -23,6 +23,8 @@ class VideoRecord(BaseModel):
     duration_seconds: float | None = None
     created_at: datetime
     size_bytes: int = 0
+    content_hash: str | None = None
+    duplicate: bool = False
 
 
 class VideoListResponse(BaseModel):

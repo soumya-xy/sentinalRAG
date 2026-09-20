@@ -86,6 +86,16 @@ class MemoryCatalog:
         items = [video for video in self.videos.values() if video.user_id == user_id]
         return sorted(items, key=lambda item: item.created_at, reverse=True)
 
+    def find_videos_by_content_hash(self, user_id: str, content_hash: str) -> list[VideoInternal]:
+        if not content_hash:
+            return []
+        items = [
+            video
+            for video in self.videos.values()
+            if video.user_id == user_id and video.content_hash == content_hash
+        ]
+        return sorted(items, key=lambda item: item.created_at, reverse=True)
+
     def set_video_status(
         self,
         video_id: str,

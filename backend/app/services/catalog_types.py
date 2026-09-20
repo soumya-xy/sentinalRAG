@@ -37,6 +37,7 @@ class VideoInternal:
     status: VideoStatus
     created_at: datetime
     size_bytes: int
+    content_hash: str | None = None
     duration_seconds: float | None = None
     error: str | None = None
     events_materialized: bool = False

@@ -30,3 +30,5 @@ class QueryResponse(BaseModel):
         default=None,
         description="llm | extractive | none — how the answer text was produced",
     )
+    visual_reinspection_skipped: bool = False
+    query_id: str | None = None

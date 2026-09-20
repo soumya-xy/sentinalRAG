@@ -42,7 +42,7 @@ class FrameSampler:
 
         cap = cv2.VideoCapture(str(video_path))
         if not cap.isOpened():
-            logger.error("Could not open video %s", video_path)
+            logger.error("Could not open video path=%s", video_path)
             return []
 
         fps = float(cap.get(cv2.CAP_PROP_FPS) or 0.0) or 30.0
@@ -76,5 +76,5 @@ class FrameSampler:
             frame_index += 1
 
         cap.release()
-        logger.info("Sampled %s frames from %s", len(frames), video_id)
+        logger.info("Sampled frame_count=%s", len(frames))
         return frames

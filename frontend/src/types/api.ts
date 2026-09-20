@@ -62,6 +62,8 @@ export interface VideoRecord {
   duration_seconds: number | null
   created_at: string
   size_bytes: number
+  content_hash?: string | null
+  duplicate?: boolean
 }
 
 export interface VideoListResponse {
@@ -104,6 +106,8 @@ export interface QueryResponse {
   camera_id: string
   provenance?: string | null
   answer_source?: string | null
+  visual_reinspection_skipped?: boolean
+  query_id?: string | null
 }
 
 export interface HealthResponse {

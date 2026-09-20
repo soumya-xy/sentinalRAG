@@ -2,6 +2,25 @@ from app.models.event import BoundingBox, EventRecord
 from app.services.store import store
 
 
+def fake_mp4_bytes(tag: bytes = b"test") -> bytes:
+    """Minimal ISO BMFF `ftyp` box so upload sniffing accepts the payload."""
+    header = bytearray(32)
+    header[0:4] = (32).to_bytes(4, "big")
+    header[4:8] = b"ftyp"
+    header[8:12] = b"mp42"
+    header[16:20] = b"mp42"
+    header[20:24] = b"isom"
+    return bytes(header) + tag
+
+
+def fake_avi_bytes() -> bytes:
+    return b"RIFF" + (32).to_bytes(4, "little") + b"AVI LIST" + b"\x00" * 16
+
+
+def fake_jpeg_bytes() -> bytes:
+    return b"\xff\xd8\xff\xe0\x00\x10JFIF" + b"\x00" * 24
+
+
 def fake_event(video_id: str, camera_id: str) -> EventRecord:
     return EventRecord(
         event_id="evt_test01",

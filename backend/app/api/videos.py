@@ -1,22 +1,26 @@
+import logging
 import tempfile
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 
 from app.api.deps import get_current_user
 from app.core.config import get_settings
 from app.models.auth import UserPublic
 from app.models.video import VideoListResponse, VideoRecord, VideoStatusResponse
+from app.core.context import set_video_id
 from app.pipeline.sampling import probe_video
+from app.services.content_hash import sha256_hex
 from app.services.object_storage import upload_video
 from app.services.processing import build_status, enqueue_ingest
 from app.services.store import VideoInternal, now_utc, store
 from app.services.supabase_client import reset_supabase_clients
+from app.services.video_sniff import ALLOWED_SUFFIXES, VideoSniffError, validate_video_payload
+
+logger = logging.getLogger("sentinelrag.videos")
 
 router = APIRouter(prefix="/api/videos", tags=["videos"])
-
-ALLOWED_SUFFIXES = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v"}
 
 CONTENT_TYPES = {
     ".mp4": "video/mp4",
@@ -28,7 +32,7 @@ CONTENT_TYPES = {
 }
 
 
-def to_record(video: VideoInternal) -> VideoRecord:
+def to_record(video: VideoInternal, *, duplicate: bool = False) -> VideoRecord:
     return VideoRecord(
         video_id=video.video_id,
         camera_id=video.camera_id,
@@ -38,6 +42,8 @@ def to_record(video: VideoInternal) -> VideoRecord:
         duration_seconds=video.duration_seconds,
         created_at=video.created_at,
         size_bytes=video.size_bytes,
+        content_hash=video.content_hash,
+        duplicate=duplicate,
     )
 
 
@@ -65,8 +71,9 @@ def list_videos(user: UserPublic = Depends(get_current_user)) -> VideoListRespon
     return VideoListResponse(videos=videos)
 
 
-@router.post("", response_model=VideoRecord, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=VideoRecord)
 async def upload_video_endpoint(
+    response: Response,
     file: UploadFile = File(...),
     camera_id: str = Form(default="cam-01"),
     user: UserPublic = Depends(get_current_user),
@@ -83,8 +90,46 @@ async def upload_video_endpoint(
     if not payload:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded file is empty")
 
+    try:
+        validate_video_payload(payload, suffix)
+    except VideoSniffError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from None
+
+    camera = (camera_id or "cam-01").strip() or "cam-01"
+    digest = sha256_hex(payload)
+    matches = store.find_videos_by_content_hash(user.user_id, digest)
+    ready = next((item for item in matches if item.status == "ready"), None)
+    if ready:
+        set_video_id(ready.video_id)
+        logger.info("Duplicate completed upload reused existing video hash=%s", digest[:12])
+        response.status_code = status.HTTP_200_OK
+        return to_record(ready, duplicate=True)
+
+    existing = next((item for item in matches if item.status != "ready"), None)
+    if existing and existing.status == "processing":
+        set_video_id(existing.video_id)
+        logger.info("Upload matched an in-progress ingest")
+        response.status_code = status.HTTP_200_OK
+        return to_record(existing, duplicate=False)
+    if existing:
+        set_video_id(existing.video_id)
+        existing.camera_id = camera
+        existing.original_filename = original
+        existing.content_hash = digest
+        store.put_video(existing)
+        logger.info(
+            "Reprocessing incomplete/failed upload hash=%s status_was=%s",
+            digest[:12],
+            existing.status,
+        )
+        enqueue_ingest(existing.video_id)
+        refreshed = store.get_video(existing.video_id) or existing
+        response.status_code = status.HTTP_201_CREATED
+        return to_record(refreshed, duplicate=False)
+
     settings = get_settings()
     video_id = f"vid_{uuid4().hex[:10]}"
+    set_video_id(video_id)
     filename = f"{video_id}{suffix}"
     if settings.supabase_enabled:
         try:
@@ -114,7 +159,6 @@ async def upload_video_endpoint(
         stored_path = f"memory/{user.user_id}/{filename}"
         duration = None
 
-    camera = (camera_id or "cam-01").strip() or "cam-01"
     video = VideoInternal(
         video_id=video_id,
         user_id=user.user_id,
@@ -125,11 +169,14 @@ async def upload_video_endpoint(
         status="uploaded",
         created_at=now_utc(),
         size_bytes=len(payload),
+        content_hash=digest,
         duration_seconds=duration,
     )
     store.put_video(video)
+    logger.info("Upload accepted size_bytes=%s suffix=%s", len(payload), suffix)
     enqueue_ingest(video.video_id)
     refreshed = store.get_video(video_id) or video
+    response.status_code = status.HTTP_201_CREATED
     return to_record(refreshed)
 
 
@@ -153,6 +200,8 @@ def retry_ingest(video_id: str, user: UserPublic = Depends(get_current_user)) ->
             status_code=status.HTTP_409_CONFLICT,
             detail="Retry is only available after a failed ingest.",
         )
+    set_video_id(video.video_id)
+    logger.info("Retry ingest requested")
     enqueue_ingest(video.video_id)
     refreshed = store.get_video(video_id) or video
     return to_record(refreshed)
